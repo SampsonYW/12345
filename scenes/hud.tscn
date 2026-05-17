@@ -1,0 +1,122 @@
+[gd_scene load_steps=2 format=3 uid="uid://bhud0000001"]
+
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+
+[node name="HUD" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("1_hud")
+
+[node name="TopLeft" type="VBoxContainer" parent="."]
+layout_mode = 1
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 260.0
+offset_bottom = 200.0
+mouse_filter = 2
+
+[node name="HPLabel" type="Label" parent="TopLeft"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "HP  100 / 100"
+
+[node name="HPBar" type="ProgressBar" parent="TopLeft"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 16)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="Spacer1" type="Control" parent="TopLeft"]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ErosionLabel" type="Label" parent="TopLeft"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "侵蚀  0%"
+
+[node name="ErosionBar" type="ProgressBar" parent="TopLeft"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 16)
+layout_mode = 2
+max_value = 100.0
+value = 0.0
+show_percentage = false
+
+[node name="Spacer2" type="Control" parent="TopLeft"]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="WeightLabel" type="Label" parent="TopLeft"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "负重  0 / 50"
+
+[node name="TopRight" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -260.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 160.0
+mouse_filter = 2
+
+[node name="AmmoLabel" type="Label" parent="TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "弹药  60 / 60"
+horizontal_alignment = 2
+
+[node name="ScoreLabel" type="Label" parent="TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "分数  0"
+horizontal_alignment = 2
+
+[node name="CollectibleLabel" type="Label" parent="TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "残响  0"
+horizontal_alignment = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -244.0
+offset_top = -88.0
+offset_right = 244.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 4
+mouse_filter = 2
+
+[node name="BlockedLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -100.0
+offset_right = 160.0
+offset_bottom = -70.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+text = ""

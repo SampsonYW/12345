@@ -1,0 +1,34 @@
+# --- Godot 4 ---
+# 编辑器导入缓存 / shader cache / mono cache / global script class cache
+# 这个目录每次打开项目都会被重新生成，不要提交
+.godot/
+
+# 安卓导出生成的目录（如果做安卓导出会自动出现）
+/android/
+
+# --- Godot Mono / C# 相关 ---
+# 本项目 project.godot 里有 [dotnet] 段，即便目前用 GDScript，留着这些以防后续启用 C#
+.mono/
+data_*/
+mono_crash.*.json
+[Bb]in/
+[Oo]bj/
+*.csproj.user
+*.sln.DotSettings.user
+
+# --- Claude Code 状态（每个开发者本地的会话/任务/工作区） ---
+.claude/
+
+# --- 常见操作系统垃圾文件 ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- 编辑器临时 / 备份 ---
+*.tmp
+*.bak
+*.swp
+*~
+
+# --- 调试日志（headless 跑 godot 留下的临时文件） ---
+godot_*.log
