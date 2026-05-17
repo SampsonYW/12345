@@ -127,7 +127,7 @@ func _physics_process(delta: float) -> void:
             is_sprinting = false
     cooldown_timer -= delta
 
-func _unput(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("sprint") and cooldown_timer <= 0:
         is_sprinting = true
         sprint_timer = sprint_duration
@@ -226,8 +226,7 @@ enum Type { COLLECTIBLE, AMMO, BATTERY, PURIFIER }
 @export var item_name: String
 @export var icon: Texture2D
 @export var type: Type
-@export var weight: float         # 负重 Tag
-@export var erosion: float        # 侵蚀 Tag（仅拾取时判断是否超限，不增加侵蚀值）
+@export var weight: float         # 负重
 @export var score_value: int      # 撤出分数（COLLECTIBLE）
 @export var ammo_amount: int      # 弹药补给量（AMMO）
 @export var heal_amount: float    # 回复量（BATTERY）
@@ -303,7 +302,7 @@ var current_weight := 0.0
 func can_pickup(item: ItemData) -> bool:
     if current_weight + item.weight > GameManager.max_weight:
         return false
-    if GameManager.player_erosion + item.erosion > GameManager.max_erosion:
+    if GameManager.player_erosion >= GameManager.max_erosion:
         return false
     return true
 
@@ -670,7 +669,7 @@ func execute_event(type: EventType) -> void:
         EventType.ENEMY_TIDE:
             # 连续快速刷怪
             for i in range(5):
-                $"../SpawnManager".spawn_enemy(GameManager.elapsed_time)
+                $"../SpawnManager".spawn_enemy(GameManager.elapsed_time, GameManager.get_erosion_tier())
 ```
 
 ---
