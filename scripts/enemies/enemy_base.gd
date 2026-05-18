@@ -1,10 +1,11 @@
 # enemy_base.gd
 # 所有敌人的基类：警戒值、HP、侵蚀倍率属性、导航移动
 # 子类（patrol_enemy.gd / dormant_enemy.gd）扩展具体 AI 行为
+# [AI-ASSISTED] 2026-05-19 - 按 docs/rules.md 规范化信号类型和内部状态
 extends CharacterBody2D
 
 signal awakened
-signal died(enemy)
+signal died(enemy: CharacterBody2D)
 
 # ----- 共有参数（implementation.md §4.2 / §13）-----
 @export var alert_threshold: float = 100.0
@@ -13,17 +14,17 @@ signal died(enemy)
 @export var base_damage: float = 15.0
 
 # ----- 内部状态 -----
-var current_alert: float = 0.0
-var is_awake: bool = false
-var erosion_tier: int = 0
-var current_hp: float = 0.0
+var _current_alert: float = 0.0
+var _is_awake: bool = false
+var _erosion_tier: int = 0
+var _current_hp: float = 0.0
 
 @onready var nav_agent: NavigationAgent2D = get_node_or_null("NavigationAgent2D")
 
 
 func _ready() -> void:
 	add_to_group("enemies")
-	current_hp = get_scaled_hp()
+	_current_hp = get_scaled_hp()
 	if nav_agent != null:
 		nav_agent.path_desired_distance = 6.0
 		nav_agent.target_desired_distance = 12.0
@@ -32,54 +33,41 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	# 警戒值随时间衰减
-	if not is_awake and current_alert > 0.0:
-		current_alert = maxf(0.0, current_alert - decay_rate * delta)
+	if not _is_awake and _current_alert > 0.0:
+		_current_alert = maxf(0.0, _current_alert - decay_rate * delta)
 
 
 # ----- 侵蚀属性倍率 -----
 func get_scaled_hp() -> float:
-	return base_hp * GameManager.EROSION_STAT_MULTIPLIER[erosion_tier]
+	return base_hp * GameManager.EROSION_STAT_MULTIPLIER[_erosion_tier]
 
 
 func get_scaled_damage() -> float:
-	return base_damage * GameManager.EROSION_STAT_MULTIPLIER[erosion_tier]
+	return base_damage * GameManager.EROSION_STAT_MULTIPLIER[_erosion_tier]
 
 
 # ----- 噪音接收 -----
 func receive_noise(value: float) -> void:
-	if is_awake:
+	if _is_awake:
 		return
-	current_alert += value
-	if current_alert >= alert_threshold:
-		awaken()
+	_current_alert += value
+	if _current_alert >= alert_threshold:
+		_awaken()
 
 
 # 强制觉醒（被攻击 / 事件触发）
 func force_awaken() -> void:
-	if not is_awake:
-		awaken()
-
-
-func awaken() -> void:
-	is_awake = true
-	current_alert = alert_threshold
-	awakened.emit()
+	if not _is_awake:
+		_awaken()
 
 
 # ----- 受伤 / 死亡 -----
 func take_damage(amount: float, from_player: bool = true) -> void:
-	current_hp -= amount
+	_current_hp -= amount
 	if from_player:
 		force_awaken()
-	if current_hp <= 0.0:
-		die()
-
-
-func die() -> void:
-	died.emit(self)
-	if GameManager:
-		GameManager.register_kill()
-	queue_free()
+	if _current_hp <= 0.0:
+		_die()
 
 
 # ----- 导航移动 -----
@@ -108,11 +96,6 @@ func nav_move_to(target: Vector2, speed: float) -> bool:
 	return false
 
 
-func _face_velocity() -> void:
-	if velocity.length_squared() > 1.0:
-		rotation = velocity.angle()
-
-
 # 把任意点贴到 navmesh 的最近可行走位置；map 未同步时返回原点
 func snap_to_navmesh(point: Vector2) -> Vector2:
 	var map: RID = get_world_2d().navigation_map
@@ -122,3 +105,21 @@ func snap_to_navmesh(point: Vector2) -> Vector2:
 	if iter_count == 0:
 		return point
 	return NavigationServer2D.map_get_closest_point(map, point)
+
+
+func _face_velocity() -> void:
+	if velocity.length_squared() > 1.0:
+		rotation = velocity.angle()
+
+
+func _awaken() -> void:
+	_is_awake = true
+	_current_alert = alert_threshold
+	awakened.emit()
+
+
+func _die() -> void:
+	died.emit(self)
+	if GameManager:
+		GameManager.register_kill()
+	queue_free()

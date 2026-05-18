@@ -1,17 +1,7 @@
 # hud.gd
 # 局内 UI：HP / 弹药 / 侵蚀 / 负重 / 收集品 / 8 槽背包栏 / 提示
+# [AI-ASSISTED] 2026-05-19 - 按 docs/rules.md 规范化脚本结构和安全引用
 extends Control
-
-@onready var hp_bar: ProgressBar = %HPBar
-@onready var hp_label: Label = %HPLabel
-@onready var erosion_bar: ProgressBar = %ErosionBar
-@onready var erosion_label: Label = %ErosionLabel
-@onready var weight_label: Label = %WeightLabel
-@onready var ammo_label: Label = %AmmoLabel
-@onready var score_label: Label = %ScoreLabel
-@onready var collectible_label: Label = %CollectibleLabel
-@onready var blocked_label: Label = %BlockedLabel
-@onready var slots_container: HBoxContainer = %BottomBar
 
 const EMPTY_SLOT_COLOR := Color(0.12, 0.12, 0.12, 0.7)
 const TYPE_COLORS := {
@@ -25,7 +15,18 @@ var _player_health: Node = null
 var _player_shooting: Node = null
 var _inventory: Node = null
 var _blocked_hide_timer: float = 0.0
-var _slot_panels: Array = []
+var _slot_panels: Array[Panel] = []
+
+@onready var hp_bar: ProgressBar = %HPBar
+@onready var hp_label: Label = %HPLabel
+@onready var erosion_bar: ProgressBar = %ErosionBar
+@onready var erosion_label: Label = %ErosionLabel
+@onready var weight_label: Label = %WeightLabel
+@onready var ammo_label: Label = %AmmoLabel
+@onready var score_label: Label = %ScoreLabel
+@onready var collectible_label: Label = %CollectibleLabel
+@onready var blocked_label: Label = %BlockedLabel
+@onready var slots_container: HBoxContainer = %BottomBar
 
 
 func _ready() -> void:
@@ -125,8 +126,10 @@ func _on_inventory_changed(slots: Array, current_weight: float, max_weight: floa
 	weight_label.text = "负重  %d / %d" % [int(round(current_weight)), int(max_weight)]
 	for i in _slot_panels.size():
 		var panel: Panel = _slot_panels[i]
-		var fill: ColorRect = panel.get_node("Fill")
-		var name_lbl: Label = panel.get_node("ItemName")
+		var fill := panel.get_node_or_null("Fill") as ColorRect
+		var name_lbl := panel.get_node_or_null("ItemName") as Label
+		if fill == null or name_lbl == null:
+			continue
 		var item: ItemData = slots[i] if i < slots.size() else null
 		if item == null:
 			fill.color = EMPTY_SLOT_COLOR

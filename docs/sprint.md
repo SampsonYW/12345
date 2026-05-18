@@ -12,9 +12,79 @@
 | 角色 | 主要负责 |
 |------|----------|
 | **Dev A** | 角色控制 + 武器射击 + 战斗系统 |
-| **Dev B** | 地图 + 容器 + 物品系统（双 Tag） |
+| **Dev B** | 地图 + 容器 + 物品系统 |
 | **Dev C** | 敌人 AI + 时间刷怪 + 撤离系统 |
-| **Designer D** | 美术资产（ComfyUI）+ 音效 + UI 界面 |
+| **Designer D** | 美术资产 + 音效 + UI 界面 |
+
+---
+
+## 按结构解耦后的三人开发分工
+
+> **执行原则**: 三个 Dev 不按“今天谁有空”抢任务，而按模块 ownership 推进。跨模块只通过稳定接口协作：Autoload API、信号、节点 group、Resource 数据。需要改对方模块时，先在每日站会同步接口，再由模块 owner 修改。
+
+### 模块边界与文件归属
+
+| 负责人 | 领域 ownership | 主要文件/场景 | 对外接口 | 避免直接改动 |
+|------|---------------|--------------|----------|-------------|
+| **Dev A** | 玩家操作、武器、生命、局状态、HUD 联调 | `scripts/player/player.gd`、`scripts/player/player_shooting.gd`、`scripts/player/player_health.gd`、`scripts/player/bullet.gd`、`scripts/managers/game_manager.gd`、`scripts/ui/hud.gd`、`scenes/player.tscn`、`scenes/bullet.tscn`、`scenes/hud.tscn` | `GameManager.start_run()` / `set_state()` / `add_erosion()` / `reduce_erosion()` / `get_erosion_tier()`；`PlayerHealth.take_damage()`；`PlayerShooting.add_ammo()`；`player` group；HUD 只监听信号 | 不写 Loot 规则、不写敌人 AI、不在玩家脚本里遍历敌人列表 |
+| **Dev B** | 地图、容器、物品、背包、分数、视野/探索 | `scripts/items/*`、`scripts/player/inventory.gd`、`resources/items/*`、`scenes/container.tscn`、`scenes/item_pickup.tscn`、`scenes/game.tscn` 中的地图/容器节点、后续 `scripts/systems/fog_of_war.gd` | `ItemData` 资源字段；`Inventory.add_item()` / `use_slot()` / `calculate_score()`；`inventory_changed` / `collectible_changed` 信号；`Container.cracked`；读取 `GameManager.player_erosion` 和 `max_weight` | 不改玩家移动/射击、不改敌人状态机、不在容器里处理战斗逻辑 |
+| **Dev C** | 敌人、噪音、刷怪、撤离压力 | `scripts/enemies/*`、`scripts/managers/noise_manager.gd`、后续 `scripts/managers/spawn_manager.gd`、后续 `scripts/systems/extraction.gd`、`scenes/patrol_enemy.tscn`、`scenes/dormant_enemy.tscn` | `NoiseManager.emit_noise(origin, level)`；敌人加入 `enemies` group；`EnemyBase.receive_noise()` / `take_damage()`；`SpawnManager.on_signal_flare()`；撤离成功调用 `GameManager.set_state(SUCCESS)` | 不改背包/物品计分、不改 HUD 布局、不在敌人脚本里生成 Loot |
+
+### 依赖方向
+
+```text
+Player/Input -> GameManager
+PlayerShooting -> NoiseManager -> EnemyBase/Enemy AI
+Bullet -> EnemyBase.take_damage()
+Enemy AI -> PlayerHealth.take_damage() -> GameManager.add_erosion()
+Container -> ItemPickup -> Inventory -> HUD
+Inventory -> PlayerShooting / PlayerHealth / GameManager
+SpawnManager -> Enemy scenes
+Extraction -> NoiseManager + SpawnManager + GameManager
+HUD -> 只监听各系统信号，不反向控制玩法
+```
+
+**关键解耦规则**
+
+- `GameManager` 只保存全局状态、侵蚀、计时、Run 状态，不直接生成物品或敌人。
+- `NoiseManager` 是唯一噪音传播入口。开枪、冲刺、破解、信号弹都调用它，但不自己查找敌人逻辑。
+- `ItemData` 是物品唯一数据源。分数、负重、补给量、回血、净化都从资源读取，不散落在玩家/容器/结算脚本里。
+- `Inventory` 归 Dev B，即使挂在 `Player` 下，也只负责“能否拾取、使用物品、计算分数”。`player.gd` 只转发快捷键。
+- `EnemyBase` 暴露 `take_damage()` 和 `receive_noise()`，子弹和噪音系统只依赖这两个方法，不关心敌人具体状态机。
+- `HUD` 归 Dev A 做联调层，只监听信号展示状态，避免在 UI 脚本里修改背包、血量或敌人。
+
+### Day 1-4 主线任务重排
+
+| 时间 | Dev A：玩家/状态/HUD | Dev B：地图/Loot/物品 | Dev C：敌人/噪音/撤离 |
+|------|---------------------|----------------------|----------------------|
+| **Day 1** | 项目输入映射、玩家移动/冲刺/摄像机、`GameManager.start_run()`、玩家写入 `GameManager.player_position` | 基础地图、障碍碰撞、容器占位、`ItemData` 字段定稿 | `EnemyBase`、巡逻/休眠状态枚举、敌人场景占位、加入 `enemies` group |
+| **Day 2** | 射击、子弹、弹药信号、HUD 弹药显示、子弹调用 `EnemyBase.take_damage()` | 容器长按破解、破解进度条、基础物品资源、容器破解后掉落占位 | 巡逻视觉锥、休眠噪音唤醒、追击、`NoiseManager.emit_noise()` 稳定 |
+| **Day 3** | `PlayerHealth`、受击无敌帧、死亡状态、受击侵蚀、HUD HP/侵蚀显示 | `ItemPickup`、`Inventory`、负重/侵蚀硬门槛、净化剂/弹药/电池使用、分数计算 | 敌人攻击、侵蚀 tier 属性倍率、噪音衰减警戒、敌人死亡注册击杀 |
+| **Day 4** | 信号弹 UI 状态、撤离/死亡状态 HUD、必要的输入提示 | 战争迷雾基础版、已探索留痕、弹药箱/医疗容器补给逻辑 | `SpawnManager` 时间刷怪、信号弹全图噪音、刷怪强度 ×3、`Extraction` 等待/登车/成功流程 |
+
+### Day 5-7 收口任务
+
+| 时间 | Dev A | Dev B | Dev C |
+|------|-------|-------|-------|
+| **Day 5** | 死亡/成功跳转结算、开始/重开流程接线、射击手感、HUD 联调 | 结算分数数据、物品数值初调、地图容器密度调整 | 撤离阶段波次压力、敌人生成曲线初调、全流程敌人 Bug 修复 |
+| **Day 6** | 战斗手感、弹药经济和 HP 体验调参 | 负重/侵蚀/容器收益调参、地图路线节奏调参 | 敌人速度、攻击频率、觉醒反应、刷怪间隔调参 |
+| **Day 7** | 最终关键 Bug、打包前流程检查 | Windows/WebGL 打包、提交包检查 | 最终关键 Bug、撤离阶段稳定性检查 |
+
+### 接口冻结点
+
+| 时间点 | 必须冻结的接口 | 原因 |
+|------|----------------|------|
+| **Day 1 结束** | `player` group、`enemies` group、`GameManager.player_position`、`ItemData` 字段 | Day 2 开始射击、容器、AI 都要依赖这些基础入口 |
+| **Day 2 结束** | `NoiseManager.emit_noise()`、`EnemyBase.take_damage()`、`Inventory.add_item()`、`PlayerHealth.take_damage()` | Day 3 的受击、Loot、噪音和敌人攻击要并行开发 |
+| **Day 3 结束** | `GameManager.get_erosion_tier()`、`Inventory.calculate_score()`、`PlayerShooting.add_ammo()` | Day 4 刷怪倍率、补给、撤离前完整循环依赖这些 API |
+| **Day 4 结束** | `GameManager.State.SUCCESS/DEAD`、`SpawnManager.on_signal_flare()`、`Extraction` 成功条件 | Day 5 进入结算和流程闭环，不能再大改状态流 |
+
+### 联调顺序
+
+1. 每天先各自完成 owner 模块的可运行小闭环。
+2. 当天最后 30-45 分钟只做集成：Dev A 接 HUD/状态，Dev B 接物品/地图，Dev C 接敌人/压力。
+3. 如果出现跨域 Bug，先确认是“接口调用错”还是“owner 内部逻辑错”；接口调用错由调用方修，内部逻辑错由 owner 修。
+4. Day 4 是硬节点：如果完整 Run 还没跑通，Day 5 取消新增 polish，全员只修主流程。
 
 ---
 

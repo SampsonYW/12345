@@ -1,9 +1,13 @@
 # patrol_enemy.gd
 # 巡逻型敌人：随机巡逻 + 视觉锥发现玩家 + 追击 + 近身攻击
 # design.md §8.2 / implementation.md §5.1
+# [AI-ASSISTED] 2026-05-19 - 按 docs/rules.md 规范化脚本结构和私有状态
 extends "res://scripts/enemies/enemy_base.gd"
 
 enum State { PATROL, CHASE, ATTACK }
+
+const MAX_PATROL_TIME := 5.0
+const VISION_RAY_MASK := 36  # Obstacles(4) + Boundary(32)
 
 @export var patrol_speed: float = 100.0
 @export var chase_speed: float = 200.0
@@ -13,33 +17,24 @@ enum State { PATROL, CHASE, ATTACK }
 @export var attack_cooldown: float = 1.0
 @export var patrol_radius: float = 250.0
 
-var state: State = State.PATROL
-var patrol_target: Vector2 = Vector2.ZERO
-var attack_timer: float = 0.0
-var patrol_stuck_timer: float = 0.0
-
-const MAX_PATROL_TIME := 5.0
-const VISION_RAY_MASK := 36  # Obstacles(4) + Boundary(32)
-
+var _state: State = State.PATROL
+var _patrol_target: Vector2 = Vector2.ZERO
+var _attack_timer: float = 0.0
+var _patrol_stuck_timer: float = 0.0
 var _player_cache: Node2D = null
 
 
 func _ready() -> void:
 	super._ready()
-	pick_patrol_target()
+	_pick_patrol_target()
 	awakened.connect(_on_awakened)
-
-
-func _on_awakened() -> void:
-	if state != State.CHASE and state != State.ATTACK:
-		state = State.CHASE
 
 
 func _physics_process(delta: float) -> void:
 	var player: Node2D = _get_player()
 	if player == null:
 		return
-	match state:
+	match _state:
 		State.PATROL:
 			_update_patrol(delta, player)
 		State.CHASE:
@@ -48,23 +43,28 @@ func _physics_process(delta: float) -> void:
 			_update_attack(delta, player)
 
 
+func _on_awakened() -> void:
+	if _state != State.CHASE and _state != State.ATTACK:
+		_state = State.CHASE
+
+
 func _update_patrol(delta: float, player: Node2D) -> void:
-	patrol_stuck_timer += delta
-	var reached: bool = nav_move_to(patrol_target, patrol_speed)
-	if reached or patrol_stuck_timer > MAX_PATROL_TIME:
-		pick_patrol_target()
-		patrol_stuck_timer = 0.0
+	_patrol_stuck_timer += delta
+	var reached: bool = nav_move_to(_patrol_target, patrol_speed)
+	if reached or _patrol_stuck_timer > MAX_PATROL_TIME:
+		_pick_patrol_target()
+		_patrol_stuck_timer = 0.0
 
 	# 视觉锥发现 → 立刻觉醒并追击
 	if _can_see(player):
 		force_awaken()
-		state = State.CHASE
+		_state = State.CHASE
 
 
 func _update_chase(_delta: float, player: Node2D) -> void:
 	var dist: float = global_position.distance_to(player.global_position)
 	if dist <= attack_range:
-		state = State.ATTACK
+		_state = State.ATTACK
 		velocity = Vector2.ZERO
 		return
 	nav_move_to(player.global_position, chase_speed)
@@ -74,12 +74,12 @@ func _update_attack(delta: float, player: Node2D) -> void:
 	# 持续面向玩家
 	var to_p: Vector2 = player.global_position - global_position
 	rotation = to_p.angle()
-	attack_timer -= delta
-	if attack_timer <= 0.0:
+	_attack_timer -= delta
+	if _attack_timer <= 0.0:
 		_deal_damage(player)
-		attack_timer = attack_cooldown
+		_attack_timer = attack_cooldown
 	if to_p.length() > attack_range * 1.5:
-		state = State.CHASE
+		_state = State.CHASE
 
 
 func _deal_damage(player: Node2D) -> void:
@@ -105,12 +105,12 @@ func _can_see(player: Node2D) -> bool:
 	return result.is_empty()
 
 
-func pick_patrol_target() -> void:
+func _pick_patrol_target() -> void:
 	var raw_pos: Vector2 = global_position + Vector2(
 		randf_range(-patrol_radius, patrol_radius),
 		randf_range(-patrol_radius, patrol_radius)
 	)
-	patrol_target = snap_to_navmesh(raw_pos)
+	_patrol_target = snap_to_navmesh(raw_pos)
 
 
 func _get_player() -> Node2D:
