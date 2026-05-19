@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3 uid="uid://pickup3d00001"]
+
+[ext_resource type="Script" path="res://scripts/items/item_pickup_3d.gd" id="1_pickup3d"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 0.35
+
+[sub_resource type="SphereMesh" id="SphereMesh_pickup"]
+radius = 0.28
+height = 0.56
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pickup"]
+albedo_color = Color(0.9, 0.9, 0.9, 1)
+roughness = 0.45
+
+[node name="ItemPickup3D" type="Area3D"]
+collision_layer = 0
+collision_mask = 1
+script = ExtResource("1_pickup3d")
+
+[node name="Visual" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.35, 0)
+mesh = SubResource("SphereMesh_pickup")
+material_override = SubResource("StandardMaterial3D_pickup")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.35, 0)
+shape = SubResource("SphereShape3D_pickup")

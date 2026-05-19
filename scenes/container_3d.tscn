@@ -1,0 +1,37 @@
+[gd_scene load_steps=6 format=3 uid="uid://container3d001"]
+
+[ext_resource type="Script" path="res://scripts/items/container_3d.gd" id="1_container3d"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_container"]
+size = Vector3(1.2, 1, 1.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_container"]
+size = Vector3(1.2, 1, 1.2)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_interact"]
+radius = 2.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_container"]
+albedo_color = Color(0.64, 0.52, 0.27, 1)
+roughness = 0.84
+
+[node name="Container3D" type="StaticBody3D"]
+collision_layer = 16
+collision_mask = 0
+script = ExtResource("1_container3d")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.5, 0)
+shape = SubResource("BoxShape3D_container")
+
+[node name="Visual" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.5, 0)
+mesh = SubResource("BoxMesh_container")
+material_override = SubResource("StandardMaterial3D_container")
+
+[node name="InteractArea" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="InteractArea"]
+shape = SubResource("SphereShape3D_interact")

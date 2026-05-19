@@ -23,17 +23,25 @@ const RANGE_MAP := {
 
 # 发出一次噪音事件：origin 是噪音源世界坐标，level 决定噪音值与传播范围
 # 按距离线性衰减后，累加到范围内每个敌人的警戒值
-func emit_noise(origin: Vector2, level: Level) -> void:
+func emit_noise(origin: Variant, level: Level) -> void:
 	var range_val: float = RANGE_MAP.get(level, 0.0)
 	if range_val <= 0.0:
 		return
 	var noise_value := float(level)
+	var origin_pos: Vector3 = _to_noise_position(origin)
 
 	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if not enemy is Node2D:
-			continue
-		var dist: float = origin.distance_to(enemy.global_position)
+		var enemy_pos: Vector3 = _to_noise_position(enemy)
+		var dist: float = origin_pos.distance_to(enemy_pos)
 		if dist > range_val:
 			continue
 		var attenuation: float = 1.0 - (dist / range_val)
 		enemy.receive_noise(noise_value * attenuation)
+
+
+func _to_noise_position(value: Variant) -> Vector3:
+	if value is Vector3:
+		return value
+	if value is Node3D:
+		return value.global_position
+	return Vector3.ZERO

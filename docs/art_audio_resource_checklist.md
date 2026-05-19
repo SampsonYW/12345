@@ -7,9 +7,11 @@
 - **P0 必做**: Day 4 前必须有可用资源或明确 placeholder，保障完整 Run 跑通。
 - **P1 重要**: Day 5 前补齐，用于开始界面、结算界面、流程闭环和基本体验。
 - **P2 打磨**: Day 6-7 视时间追加，用于观感、反馈和提交材料。
-- **风格方向**: 2D 扁平斜俯视像素风，近未来轻末世，主色调为翡翠绿、黄昏橙、暗灰金属。
+- **风格方向**: 3D 正交斜俯视低模/纸片风，近未来轻末世，主色调为翡翠绿、黄昏橙、暗灰金属。
 - **推荐格式**: 短音效用 `.wav`，BGM 和长循环用 `.ogg`，图片用透明背景 `.png`，UI 可用 `.png` 或 Godot 控件样式资源。
 - **推荐目录**:
+  - `assets/models/`
+  - `assets/materials/`
   - `assets/sprites/player/`
   - `assets/sprites/enemies/`
   - `assets/sprites/items/`
@@ -27,35 +29,36 @@
 
 | 模块 | 资源 | 最低需求 | 用途 | 对接模块 |
 |------|------|----------|------|----------|
-| 主角 | 主角空闲动画 | 4 帧，透明 PNG | 玩家出生、静止状态 | `scenes/player.tscn` |
-| 主角 | 主角移动动画 | 6-8 帧 | 360° 移动时播放 | `scripts/player/player.gd` |
-| 主角 | 主角冲刺动画或残影 | 4 帧或 1 张残影贴图 | 冲刺反馈 | `scripts/player/player.gd` |
+| 主角 | 主角低模/纸片占位 | 1 个 Mesh 或 Sprite3D 图集 | 玩家出生、静止状态 | `scenes/player_3d.tscn` |
+| 主角 | 主角移动动画 | 6-8 帧 | 360° 移动时播放 | `scripts/player/player_3d.gd` |
+| 主角 | 主角冲刺动画或残影 | 4 帧或 1 张残影贴图 | 冲刺反馈 | `scripts/player/player_3d.gd` |
 | 主角 | 主角受伤闪白/受击帧 | 1-2 帧 | 受击和无敌帧反馈 | `scripts/player/player_health.gd` |
-| 武器 | 枪口火光 | 2-3 帧 | 射击瞬间反馈 | `scripts/player/player_shooting.gd` |
-| 武器 | 子弹贴图 | 1 张，方向可旋转 | 子弹飞行 | `scenes/bullet.tscn` |
-| 武器 | 命中特效 | 2-4 帧 | 子弹命中敌人/障碍 | `scripts/player/bullet.gd` |
-| 敌人 | 巡逻型空闲/移动 | 各 4-6 帧 | 巡逻和追击 | `scenes/patrol_enemy.tscn` |
-| 敌人 | 巡逻型攻击 | 3-5 帧 | 近身攻击提示 | `scripts/enemies/patrol_enemy.gd` |
-| 敌人 | 巡逻型死亡 | 4-6 帧或爆散贴图 | 击杀反馈 | `scripts/enemies/enemy_base.gd` |
-| 敌人 | 休眠型休眠态 | 1-2 帧 | 未觉醒状态识别 | `scenes/dormant_enemy.tscn` |
-| 敌人 | 休眠型觉醒/追击 | 4-6 帧 | 噪音唤醒后的追击 | `scripts/enemies/dormant_enemy.gd` |
+| 武器 | 枪口火光 | 2-3 帧 | 射击瞬间反馈 | `scripts/player/player_shooting_3d.gd` |
+| 武器 | 子弹发光材质/贴图 | 1 个 Mesh 或 Sprite3D 图集 | 子弹飞行 | `scenes/bullet_3d.tscn` |
+| 武器 | 命中特效 | 2-4 帧 | 子弹命中敌人/障碍 | `scripts/player/bullet_3d.gd` |
+| 敌人 | 巡逻型空闲/移动 | 各 4-6 帧 | 巡逻和追击 | `scenes/patrol_enemy_3d.tscn` |
+| 敌人 | 巡逻型攻击 | 3-5 帧 | 近身攻击提示 | `scripts/enemies/enemy_3d.gd` |
+| 敌人 | 巡逻型死亡 | 4-6 帧或爆散贴图 | 击杀反馈 | `scripts/enemies/enemy_3d.gd` |
+| 敌人 | 休眠型休眠态 | 1-2 帧 | 未觉醒状态识别 | `scenes/dormant_enemy_3d.tscn` |
+| 敌人 | 休眠型觉醒/追击 | 4-6 帧 | 噪音唤醒后的追击 | `scripts/enemies/enemy_3d.gd` |
 | 敌人 | 敌人警觉标识 | 1 个图标或小特效 | 警戒值升高、觉醒提示 | `NoiseManager` / 敌人脚本 |
-| 容器 | 普通容器关闭/打开 | 各 1 张 | 搜刮主容器 | `scenes/container.tscn` |
-| 容器 | 弹药箱关闭/打开 | 各 1 张 | 弹药补给 | `resources/items/standard_ammo.tres` |
-| 容器 | 医疗容器关闭/打开 | 各 1 张 | 电池、净化剂来源 | `resources/items/battery_small.tres` / `purifier.tres` |
-| 容器 | 破解读条视觉 | UI 条或环形条素材 | 长按 E 破解反馈 | `scripts/items/container.gd` |
+| 容器 | 普通容器关闭/打开外观 | 各 1 个 Mesh 或 Sprite3D 外观 | 搜刮主容器 | `scenes/container_3d.tscn` |
+| 容器 | 弹药箱关闭/打开外观 | 各 1 个 Mesh 或 Sprite3D 外观 | 弹药补给 | `resources/items/standard_ammo.tres` |
+| 容器 | 医疗容器关闭/打开外观 | 各 1 个 Mesh 或 Sprite3D 外观 | 电池、净化剂来源 | `resources/items/battery_small.tres` / `purifier.tres` |
+| 容器 | 破解读条视觉 | UI 条或环形条素材 | 长按 E 破解反馈 | `scripts/items/container_3d.gd` |
+| 物品 | 地面拾取物 3D 外观 | 4 类颜色/形状可区分 | 掉落在地图中的可拾取物 | `scenes/item_pickup_3d.tscn` |
 | 物品 | 残响收集品图标 | 1-3 种 | 分数来源 | `resources/items/relic_small.tres` |
 | 物品 | 标准弹药图标 | 1 张 | 拾取和背包显示 | `resources/items/standard_ammo.tres` |
 | 物品 | 能量电池图标 | 1 张 | 回复 HP | `resources/items/battery_small.tres` |
 | 物品 | 净化剂图标 | 1 张 | 降低侵蚀 | `resources/items/purifier.tres` |
-| 地图 | 基础地面 Tile | 4-8 张变体 | 地图铺底 | `scenes/game.tscn` |
+| 地图 | 3D 地面材质/低模块 | 4-8 张变体或 Mesh 材质 | 地图铺底 | `scenes/game_3d.tscn` |
 | 地图 | 高价值区地面标识 | 2-4 张变体 | 引导玩家探索风险区 | 地图场景 |
 | 地图 | 障碍物 | 8-12 个 | 废墟、残骸、管道、货箱 | 地图碰撞 |
 | 地图 | 边界/电磁障壁 | 2-4 张或可平铺素材 | 地图外圈限制 | 地图边界 |
 | VFX | 噪音扩散波纹 | 1 套 4-6 帧 | 开枪、冲刺、破解、信号弹噪音 | `NoiseManager` |
 | VFX | 信号弹发射特效 | 4-8 帧 | 按 Q 发射信号弹 | `Extraction` |
 | VFX | 信号点/撤离等待标识 | 1 套循环特效 | 撤离等待位置 | `Extraction` |
-| VFX | 母车到达/登车提示 | 1 套特效或剪影 | 撤离成功点 | `Extraction` |
+| VFX | 母车剪影/低模 + 到达提示 | 1 个剪影/低模 + 1 套提示特效 | 等待结束、登车成功点 | `Extraction` |
 | VFX | 刷怪边缘脉冲 | 1 套 UI/VFX | 提示敌人从屏幕边缘涌入 | `SpawnManager` / HUD |
 | VFX | 侵蚀视觉叠加 | 2-3 档颜色/噪点 Overlay | 侵蚀越高画面越压迫 | HUD / 后处理 |
 | UI | HP 条 | 条形框和填充 | 局内生命显示 | `scenes/hud.tscn` |
@@ -63,6 +66,8 @@
 | UI | 弹药显示图标 | 1 张 | 当前弹药 HUD | `scripts/ui/hud.gd` |
 | UI | 负重显示图标 | 1 张 | 背包负重 HUD | `scripts/ui/hud.gd` |
 | UI | 残响/分数图标 | 1 张 | 收集品数量和分数 | `scripts/ui/hud.gd` |
+| UI | 信号弹状态图标 | READY / FIRED 两态 | 显示信号弹是否已发射 | `scripts/ui/hud.gd` |
+| UI | 时间/刷怪强度指示 | 文字样式或 1-2 个图标 | 显示存活时间与压力阶段 | `scripts/ui/hud.gd` |
 | UI | 8 格背包槽 | 空槽、选中、不可用三态 | 物品快捷栏 | `scripts/player/inventory.gd` |
 | UI | 操作提示图标 | `WASD`、鼠标左键、`E`、`Shift`、`Q` | 新玩家 30 秒理解操作 | HUD / 引导 |
 
@@ -78,8 +83,9 @@
 | UI | 成功/死亡结果标识 | 各 1 张 | 区分撤离成功和死亡 |
 | UI | 重新开始按钮 | 三态 | 结算后再来一局 |
 | 地图 | 地图装饰物 | 10-20 个 | 提升探索区域辨识度 |
+| 地图 | 小地图基础图标 | 玩家、容器、刷怪点、信号点 | 若实现小地图 HUD |
 | VFX | 屏幕震动辅助素材 | 边缘闪光/受击 vignette | 射击、受击手感 |
-| VFX | 敌人生成落点提示 | 1 套 | 撤离阶段压力提示 |
+| VFX | 事件提示图标/弹窗 | 容器警报、补给、电磁脉冲、区域开启、敌人潮汐 | 随机事件发生时的可读反馈 |
 
 ### P2: Day 6-7 打磨和提交资源
 
@@ -90,7 +96,6 @@
 | 敌人 | 巡逻型受击帧 | 1-2 帧 | 命中反馈 |
 | 敌人 | 休眠型觉醒过渡动画 | 6-8 帧 | 噪音唤醒更明显 |
 | 容器 | 稀有容器外观 | 1-2 种 | 高价值区奖励感 |
-| 地图 | 小地图图标 | 玩家、容器、刷怪点、信号点 | 若实现小地图 |
 | UI | 屏幕边缘方向指示 | 上下左右和斜向版本 | 敌人方向提示 |
 | UI | 提交用封面图 | 1 张 16:9 | Game Jam 页面 |
 | UI | 提交截图构图框 | 3-5 张截图建议 | 提交材料 |
@@ -145,6 +150,11 @@
 | 撤离 | 母车接近 | 1 个长音效 | 等待结束前提示 | `Extraction` 倒计时结束 |
 | 撤离 | 登车成功 | 1 个 | 撤离成功 | `GameManager.State.SUCCESS` |
 | 刷怪 | 屏幕边缘脉冲 | 1-2 个 | 敌人从某方向涌入 | `SpawnManager` |
+| 事件 | 容器警报 | 1 个 | 破解触发警报 | 事件系统 |
+| 事件 | 紧急补给出现 | 1 个 | 临时补给点出现 | 事件系统 |
+| 事件 | 电磁脉冲 | 1 个 | 区域断电/敌人觉醒 | 事件系统 |
+| 事件 | 封锁区域开启 | 1 个 | 通道打开 | 事件系统 |
+| 事件 | 敌人潮汐预警 | 1 个 | 某方向大量敌人涌入 | 事件系统 |
 
 ### P1 音效: UI 和流程
 
@@ -176,8 +186,8 @@
 
 | 时间 | Designer D 优先交付 | 目的 |
 |------|--------------------|------|
-| Day 1 | 主角基础动画、地面 Tile、障碍物、边界 placeholder | 保证角色能在地图中跑起来 |
-| Day 2 | 敌人两型 Sprite、容器三型 Sprite、子弹和枪口火光 | 保证“能打、能遇敌、能破解” |
+| Day 1 | 主角基础动画、3D 地面模块/材质、障碍物、边界 placeholder | 保证角色能在地图中跑起来 |
+| Day 2 | 敌人两型外观、容器三型外观、子弹和枪口火光 | 保证“能打、能遇敌、能破解” |
 | Day 3 | 拾取物图标、破解/拾取/射击音效、HUD 基础元素 | 保证完整搜刮循环可读 |
 | Day 4 | 信号弹、撤离点、母车到达、刷怪边缘提示、撤离 BGM | 保证完整 Run 可跑通 |
 | Day 5 | 开始界面、结算界面、三段 BGM 接入、死亡/成功短乐句 | 保证流程闭环 |

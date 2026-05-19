@@ -50,7 +50,7 @@ project/
 
 | 名称 | 脚本路径 | 职责 |
 |------|----------|------|
-| `GameManager` | `scripts/managers/game_manager.gd` | 全局状态、侵蚀、计时 |
+| `GameManager` | `scripts/managers/game_manager.gd` | 全局状态、侵蚀、计时、信号弹状态 |
 | `NoiseManager` | `scripts/managers/noise_manager.gd` | 噪音传播 & 警戒值 |
 
 新增 Autoload 必须：
@@ -64,9 +64,9 @@ project/
 
 | 负责人 | 领域 ownership | 主要文件/场景 | 对外接口 | 避免直接改动 |
 |------|---------------|--------------|----------|-------------|
-| **Dev A** | 玩家操作、武器、生命、局状态、HUD 联调 | `scripts/player/player.gd`、`scripts/player/player_shooting.gd`、`scripts/player/player_health.gd`、`scripts/player/bullet.gd`、`scripts/managers/game_manager.gd`、`scripts/ui/hud.gd`、`scenes/player.tscn`、`scenes/bullet.tscn`、`scenes/hud.tscn` | `GameManager.start_run()` / `set_state()` / `add_erosion()` / `reduce_erosion()` / `get_erosion_tier()`；`PlayerHealth.take_damage()`；`PlayerShooting.add_ammo()`；`player` group；HUD 信号监听 | Loot 规则、敌人 AI、地图容器布局 |
-| **Dev B** | 地图、容器、物品、背包、分数、视野/探索 | `scripts/items/*`、`scripts/player/inventory.gd`、`resources/items/*`、`scenes/container.tscn`、`scenes/item_pickup.tscn`、`scenes/game.tscn` 中的地图/容器节点、`scripts/systems/fog_of_war.gd` | `ItemData` 字段；`Inventory.add_item()` / `use_slot()` / `calculate_score()`；`inventory_changed` / `collectible_changed` 信号；`Container.cracked` | 玩家移动/射击、敌人状态机、刷怪和撤离压力 |
-| **Dev C** | 敌人、噪音、刷怪、撤离压力 | `scripts/enemies/*`、`scripts/managers/noise_manager.gd`、`scripts/managers/spawn_manager.gd`、`scripts/systems/extraction.gd`、`scenes/patrol_enemy.tscn`、`scenes/dormant_enemy.tscn` | `NoiseManager.emit_noise(origin, level)`；`EnemyBase.receive_noise()` / `take_damage()`；敌人加入 `enemies` group；`SpawnManager.on_signal_flare()`；撤离成功调用 `GameManager.set_state(SUCCESS)` | 背包/物品计分、HUD 布局、容器掉落规则 |
+| **Dev A** | 玩家操作、武器、生命、局状态、HUD 联调 | `scripts/player/player_3d.gd`、`scripts/player/player_shooting_3d.gd`、`scripts/player/player_health.gd`、`scripts/player/bullet_3d.gd`、`scripts/managers/game_manager.gd`、`scripts/ui/hud.gd`、`scenes/player_3d.tscn`、`scenes/bullet_3d.tscn`、`scenes/hud.tscn` | `GameManager.start_run()` / `set_state()` / `fire_signal_flare()` / `add_erosion()` / `reduce_erosion()` / `get_erosion_tier()`；`PlayerHealth.take_damage()`；`PlayerShooting.add_ammo()`；`player` group；HUD 信号监听 | Loot 规则、敌人 AI、地图容器布局 |
+| **Dev B** | 地图、容器、物品、背包、分数、视野/探索 | `scripts/items/*`、`scripts/player/inventory.gd`、`resources/items/*`、`scenes/container_3d.tscn`、`scenes/item_pickup_3d.tscn`、`scenes/game_3d.tscn` 中的地图/容器节点、后续 `scripts/systems/fog_of_war.gd` | `ItemData` 字段；`Inventory.add_item()` / `use_slot()` / `calculate_score()`；`inventory_changed` / `collectible_changed` 信号；`Container.cracked` | 玩家移动/射击、敌人状态机、刷怪和撤离压力 |
+| **Dev C** | 敌人、噪音、刷怪、撤离压力 | `scripts/enemies/*`、`scripts/managers/noise_manager.gd`、后续 `scripts/managers/spawn_manager.gd`、后续 `scripts/systems/extraction.gd`、`scenes/patrol_enemy_3d.tscn`、`scenes/dormant_enemy_3d.tscn` | `NoiseManager.emit_noise(origin, level)`；`EnemyBase.receive_noise()` / `take_damage()`；敌人加入 `enemies` group；`SpawnManager.on_signal_flare()`；撤离成功调用 `GameManager.set_state(SUCCESS)` | 背包/物品计分、HUD 布局、容器掉落规则 |
 | **Designer D** | 美术、音效、音乐、UI 视觉资源 | `assets/`、`docs/art_audio_resource_checklist.md`、UI 视觉素材 | 资源命名、尺寸、格式、导入路径 | 玩法脚本逻辑、数值平衡代码 |
 
 **模块边界规则**：
@@ -545,6 +545,9 @@ var tier := GameManager.get_erosion_tier()
 
 # 切换游戏状态
 GameManager.set_state(GameManager.State.EXTRACTING)
+
+# 发射信号弹（玩家输入层调用，成功后进入 EXTRACTING）
+var accepted := GameManager.fire_signal_flare(global_position)
 
 # 登记击杀
 GameManager.register_kill()

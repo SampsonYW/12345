@@ -26,9 +26,9 @@
 
 | 负责人 | 领域 ownership | 主要文件/场景 | 对外接口 | 避免直接改动 |
 |------|---------------|--------------|----------|-------------|
-| **Dev A** | 玩家操作、武器、生命、局状态、HUD 联调 | `scripts/player/player.gd`、`scripts/player/player_shooting.gd`、`scripts/player/player_health.gd`、`scripts/player/bullet.gd`、`scripts/managers/game_manager.gd`、`scripts/ui/hud.gd`、`scenes/player.tscn`、`scenes/bullet.tscn`、`scenes/hud.tscn` | `GameManager.start_run()` / `set_state()` / `add_erosion()` / `reduce_erosion()` / `get_erosion_tier()`；`PlayerHealth.take_damage()`；`PlayerShooting.add_ammo()`；`player` group；HUD 只监听信号 | 不写 Loot 规则、不写敌人 AI、不在玩家脚本里遍历敌人列表 |
-| **Dev B** | 地图、容器、物品、背包、分数、视野/探索 | `scripts/items/*`、`scripts/player/inventory.gd`、`resources/items/*`、`scenes/container.tscn`、`scenes/item_pickup.tscn`、`scenes/game.tscn` 中的地图/容器节点、后续 `scripts/systems/fog_of_war.gd` | `ItemData` 资源字段；`Inventory.add_item()` / `use_slot()` / `calculate_score()`；`inventory_changed` / `collectible_changed` 信号；`Container.cracked`；读取 `GameManager.player_erosion` 和 `max_weight` | 不改玩家移动/射击、不改敌人状态机、不在容器里处理战斗逻辑 |
-| **Dev C** | 敌人、噪音、刷怪、撤离压力 | `scripts/enemies/*`、`scripts/managers/noise_manager.gd`、后续 `scripts/managers/spawn_manager.gd`、后续 `scripts/systems/extraction.gd`、`scenes/patrol_enemy.tscn`、`scenes/dormant_enemy.tscn` | `NoiseManager.emit_noise(origin, level)`；敌人加入 `enemies` group；`EnemyBase.receive_noise()` / `take_damage()`；`SpawnManager.on_signal_flare()`；撤离成功调用 `GameManager.set_state(SUCCESS)` | 不改背包/物品计分、不改 HUD 布局、不在敌人脚本里生成 Loot |
+| **Dev A** | 玩家操作、武器、生命、局状态、HUD 联调 | `scripts/player/player_3d.gd`、`scripts/player/player_shooting_3d.gd`、`scripts/player/player_health.gd`、`scripts/player/bullet_3d.gd`、`scripts/managers/game_manager.gd`、`scripts/ui/hud.gd`、`scenes/player_3d.tscn`、`scenes/bullet_3d.tscn`、`scenes/hud.tscn` | `GameManager.start_run()` / `set_state()` / `fire_signal_flare()` / `add_erosion()` / `reduce_erosion()` / `get_erosion_tier()`；`PlayerHealth.take_damage()`；`PlayerShooting.add_ammo()`；`player` group；HUD 只监听信号 | 不写 Loot 规则、不写敌人 AI、不在玩家脚本里遍历敌人列表 |
+| **Dev B** | 地图、容器、物品、背包、分数、视野/探索 | `scripts/items/*`、`scripts/player/inventory.gd`、`resources/items/*`、`scenes/container_3d.tscn`、`scenes/item_pickup_3d.tscn`、`scenes/game_3d.tscn` 中的地图/容器节点、后续 `scripts/systems/fog_of_war.gd` | `ItemData` 资源字段；`Inventory.add_item()` / `use_slot()` / `calculate_score()`；`inventory_changed` / `collectible_changed` 信号；`Container.cracked`；读取 `GameManager.player_erosion` 和 `max_weight` | 不改玩家移动/射击、不改敌人状态机、不在容器里处理战斗逻辑 |
+| **Dev C** | 敌人、噪音、刷怪、撤离压力 | `scripts/enemies/*`、`scripts/managers/noise_manager.gd`、后续 `scripts/managers/spawn_manager.gd`、后续 `scripts/systems/extraction.gd`、`scenes/patrol_enemy_3d.tscn`、`scenes/dormant_enemy_3d.tscn` | `NoiseManager.emit_noise(origin, level)`；敌人加入 `enemies` group；`EnemyBase.receive_noise()` / `take_damage()`；`SpawnManager.on_signal_flare()`；撤离成功调用 `GameManager.set_state(SUCCESS)` | 不改背包/物品计分、不改 HUD 布局、不在敌人脚本里生成 Loot |
 
 ### 依赖方向
 
@@ -115,7 +115,7 @@ HUD -> 只监听各系统信号，不反向控制玩法
 | 射击系统（鼠标瞄准 + 子弹生成 + 碰撞伤害） | Dev A | 按左键射击，子弹命中有反馈 |
 | 弹药计数（60 发上限 + UI 显示） | Dev A | HUD 显示弹药数 |
 | 容器 Node + 破解读条（按住交互键 2-3s） | Dev B | 走近容器按住 E 键显示读条 |
-| 物品数据结构（Weight + Erosion 双 Tag） | Dev B | Resource / 数据类 |
+| 物品数据结构（Weight + 类型字段 + 类型数值） | Dev B | `ItemData` Resource；侵蚀不写入物品字段 |
 | 巡逻型 AI（随机巡逻 + 视觉锥检测 + 追击） | Dev C | 巡逻型看到玩家会追过来 |
 | 休眠型 AI（静止 + 噪音范围触发觉醒） | Dev C | 开枪后附近休眠型醒来追击 |
 | 敌人 Sprite（巡逻型 + 休眠型） | Designer D | 两种敌人的动画帧 |
@@ -127,7 +127,7 @@ HUD -> 只监听各系统信号，不反向控制玩法
 
 ## Day 3（周三）—— Loot 系统 & 侵蚀
 
-**目标**: 搜刮循环可运行——破解容器→拾取物品→侵蚀/负重积累→影响玩法
+**目标**: 搜刮循环可运行——破解容器→拾取物品→负重积累，侵蚀随时间/受击增长→影响玩法
 
 | 任务 | 负责人 | 交付物 |
 |------|--------|--------|
@@ -135,11 +135,11 @@ HUD -> 只监听各系统信号，不反向控制玩法
 | 受伤中断破解读条 + 受击侵蚀跳升 | Dev A | 破解中被打中断；受伤时侵蚀 +2~3% |
 | 侵蚀随时间自然增长（GameManager） | Dev A | 存活越久侵蚀越高 |
 | 容器打开后生成物品 + 拾取逻辑 | Dev B | 破解后显示内容，按键拾取 |
-| Weight/Erosion 累计 + 硬门槛（超限不可拾取） | Dev B | 侵蚀/负重满后无法再拾 |
+| 负重累计 + 侵蚀硬门槛（超限不可拾取） | Dev B | 负重超限或侵蚀 100% 后无法再拾 |
 | 侵蚀影响破解速度（线性映射） | Dev B | 侵蚀越高读条越慢 |
 | 净化剂拾取 + 使用降低侵蚀 | Dev B | 拾取净化剂 → 使用 → 侵蚀 -15~20% |
 | 医疗容器 + 净化剂数据（ItemData PURIFIER 类型） | Dev B | 医疗容器可破解出净化剂 |
-| 敌人攻击行为（近身 + 远程） | Dev C | 敌人追到玩家后会攻击 |
+| 敌人攻击行为（MVP 近身；远程留作扩展） | Dev C | 敌人追到玩家后会攻击 |
 | 侵蚀→敌人属性倍率（HP/伤害随侵蚀 tier 提升） | Dev C | 侵蚀越高敌人越强 |
 | 噪音系统基础（开枪→按距离衰减→范围内敌人警戒值累加） | Dev C | 噪音传播范围逻辑 |
 | 射击/破解/拾取音效 | Designer D | 基础音效集成 |
@@ -156,7 +156,7 @@ HUD -> 只监听各系统信号，不反向控制玩法
 | 任务 | 负责人 | 交付物 |
 |------|--------|--------|
 | 信号弹发射（全图噪音 + 视觉特效） | Dev A | 按键发射信号弹 |
-| 弹药箱补给逻辑 | Dev A | 弹药箱补给 +20~30 发 |
+| 弹药箱补给逻辑 | Dev B | 弹药箱破解后生成标准弹药，使用后调用 `PlayerShooting.add_ammo()` |
 | 侵蚀影响视野范围（战争迷雾基础版） | Dev B | 圆形视野 + 侵蚀越高视野越小 |
 | 已探索区域留痕 | Dev B | 走过的地方保持可见 |
 | 撤离系统（信号弹 → 60-90s 等待 → 母车到达 → 登车） | Dev C | 完整撤离流程可跑通 |
@@ -178,7 +178,7 @@ HUD -> 只监听各系统信号，不反向控制玩法
 | 死亡流程（HP=0 → 死亡动画 → 跳转结算） | Dev A | 死亡后不卡死，正常进结算 |
 | 射击手感打磨（后座力、屏幕震动、命中反馈） | Dev A | 射击 feel 提升 |
 | 收集品分数系统（不同收集品不同分值） | Dev B | 撤出的收集品计算总分 |
-| 物品平衡初调（Weight/Erosion 数值） | Dev B | 5 分钟 Run 内拿到 5-10 个物品感觉合理 |
+| 物品平衡初调（Weight/分值/补给/回复/净化） | Dev B | 5 分钟 Run 内拿到 5-10 个物品感觉合理 |
 | 敌人生成波次（信号弹后增援涌来） | Dev C | 撤离阶段有压力感 |
 | 全流程联调 + Bug 修复 | 全员 | 无崩溃地跑通完整流程 |
 | 开始界面（标题 + 开始按钮） | Designer D | 简洁的开始界面 |

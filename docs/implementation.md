@@ -1,6 +1,8 @@
 # 《余晖号》实现细节文档 (Godot 4.x / GDScript)
 
 > 本文档为 `design.md` 的技术实现补充，面向开发团队。
+> **最后更新**: 2026-05-19
+> **当前口径**: 主玩法入口已切换为 3D 正交斜俯视；已落地 3D 玩家/射击/HP/背包/容器/敌人/信号弹状态；时间刷怪、事件、撤离等待与战争迷雾按 Day 4 计划补齐。
 
 ---
 
@@ -11,30 +13,46 @@
 ```
 project/
 ├── scenes/
-│   ├── main_menu.tscn
-│   ├── game.tscn              # 核心游戏场景
-│   └── result_screen.tscn
+│   ├── game_3d.tscn           # 当前核心 3D 游戏场景
+│   ├── player_3d.tscn
+│   ├── bullet_3d.tscn
+│   ├── container_3d.tscn
+│   ├── item_pickup_3d.tscn
+│   ├── patrol_enemy_3d.tscn
+│   ├── dormant_enemy_3d.tscn
+│   ├── game.tscn              # 旧 2D 原型，当前不作为主入口
+ │   └── hud.tscn
 ├── scripts/
+│   ├── game_3d.gd             # 当前 Game3D 场景根脚本
+│   ├── game.gd                # 旧 2D 原型根脚本
 │   ├── managers/
 │   │   ├── game_manager.gd
-│   │   ├── spawn_manager.gd
-│   │   ├── event_manager.gd
+│   │   ├── spawn_manager.gd   # Day 4 待实现
+│   │   ├── event_manager.gd   # Day 4+ 待实现
 │   │   └── noise_manager.gd
 │   ├── player/
+│   │   ├── player_3d.gd
+│   │   ├── player_shooting_3d.gd
+│   │   ├── bullet_3d.gd
 │   │   ├── player.gd
 │   │   ├── player_shooting.gd
 │   │   ├── player_health.gd
-│   │   └── inventory.gd
+│   │   ├── inventory.gd
+│   │   └── signal_flare_marker.gd
 │   ├── enemies/
+│   │   ├── enemy_3d.gd
 │   │   ├── enemy_base.gd
 │   │   ├── patrol_enemy.gd
 │   │   └── dormant_enemy.gd
 │   ├── items/
+│   │   ├── container_3d.gd
+│   │   ├── item_pickup_3d.gd
 │   │   ├── container.gd
+│   │   ├── item_pickup.gd
 │   │   └── item_data.gd
 │   ├── systems/
-│   │   ├── fog_of_war.gd
-│   │   └── extraction.gd
+│   │   ├── fog_of_war.gd      # Day 4 待实现
+│   │   └── extraction.gd       # Day 4 待实现
 │   └── ui/
 │       └── hud.gd
 ├── resources/
@@ -51,29 +69,24 @@ project/
 ### 1.2 GameScene 节点树
 
 ```
-Game (Node2D)
-├── GameManager (Node)
-├── NoiseManager (Node)
-├── SpawnManager (Node)
-├── EventManager (Node)
-├── Map (Node2D)
-│   ├── Ground (TileMapLayer)
-│   ├── Obstacles (TileMapLayer)     # 碰撞层
-│   ├── Decoration (TileMapLayer)
-│   ├── Boundaries (StaticBody2D)
-│   └── SpawnPoints (Node2D)
-│       ├── SpawnPoint1 (Marker2D)
-│       └── SpawnPoint2 (Marker2D) ...
-├── Entities (Node2D)
-│   ├── Player (CharacterBody2D)
-│   ├── Enemies (Node2D)
-│   └── Containers (Node2D)
-├── FogOfWar (CanvasLayer)
+Game3D (Node3D)
+├── WorldEnvironment
+├── Sun (DirectionalLight3D)
+├── World (Node3D)
+│   ├── Ground (StaticBody3D)
+│   └── Obstacles (Node3D)
+├── CameraRig (Node3D)
+│   └── Camera3D              # 正交斜俯视相机
+├── Entities (Node3D)
+│   ├── Enemies (Node3D)
+│   ├── Containers (Node3D)
+│   ├── Pickups (Node3D)
+│   └── Player3D (CharacterBody3D)
 ├── UI (CanvasLayer)
-│   ├── HUD
-│   └── EventNotification
-└── Extraction (Node2D)
+│   └── HUD
 ```
+
+`GameManager` 与 `NoiseManager` 是 Autoload，实际挂在 `/root` 下，不作为 `game_3d.tscn` 的子节点。
 
 ---
 
@@ -141,6 +154,8 @@ func _unhandled_input(event: InputEvent) -> void:
 # player_shooting.gd
 extends Node
 
+signal ammo_changed(current: int, max_value: int)
+
 @export var bullet_scene: PackedScene
 @export var fire_rate := 0.15
 @export var bullet_speed := 800.0
@@ -150,28 +165,35 @@ var current_ammo: int
 var fire_cooldown := 0.0
 
 @onready var fire_point: Marker2D = %FirePoint
+@onready var player_node: Node2D = get_parent() as Node2D
 
 func _ready() -> void:
     current_ammo = max_ammo
+    ammo_changed.emit(current_ammo, max_ammo)
 
 func _process(delta: float) -> void:
     fire_cooldown -= delta
+    if GameManager.current_state != GameManager.State.RUNNING and GameManager.current_state != GameManager.State.EXTRACTING:
+        return
     if Input.is_action_pressed("shoot") and fire_cooldown <= 0 and current_ammo > 0:
         fire()
 
 func fire() -> void:
     var bullet = bullet_scene.instantiate()
     bullet.global_position = fire_point.global_position
-    var dir = (get_viewport().get_mouse_position() - fire_point.get_viewport_rect().size / 2).normalized()
-    bullet.direction = fire_point.global_transform.x
+    var dir: Vector2 = fire_point.global_transform.x.normalized()
+    bullet.direction = dir
+    bullet.rotation = dir.angle()
     bullet.speed = bullet_speed
-    get_tree().root.add_child(bullet)
+    get_tree().current_scene.add_child(bullet)
     current_ammo -= 1
     fire_cooldown = fire_rate
-    NoiseManager.emit_noise(global_position, NoiseManager.Level.HIGH)
+    ammo_changed.emit(current_ammo, max_ammo)
+    NoiseManager.emit_noise(player_node.global_position, NoiseManager.Level.HIGH)
 
 func add_ammo(amount: int) -> void:
     current_ammo = mini(current_ammo + amount, max_ammo)
+    ammo_changed.emit(current_ammo, max_ammo)
 ```
 
 ### 2.4 生命系统
@@ -180,8 +202,9 @@ func add_ammo(amount: int) -> void:
 # player_health.gd
 extends Node
 
+signal damaged
 signal died
-signal health_changed(current, maximum)
+signal health_changed(current: float, maximum: float)
 
 @export var max_hp := 100.0
 @export var iframe_duration := 0.5
@@ -202,12 +225,32 @@ func take_damage(amount: float) -> void:
     iframe_timer = iframe_duration
     GameManager.add_erosion(GameManager.HIT_EROSION_AMOUNT)
     health_changed.emit(current_hp, max_hp)
+    damaged.emit()
     if current_hp <= 0:
         died.emit()
+        GameManager.set_state(GameManager.State.DEAD)
 
 func heal(amount: float) -> void:
     current_hp = minf(current_hp + amount, max_hp)
     health_changed.emit(current_hp, max_hp)
+```
+
+### 2.5 信号弹输入与背包快捷键
+
+玩家脚本只负责输入分发：发射信号弹交给 `GameManager.fire_signal_flare()`，物品使用交给 `Inventory.use_slot()`。
+
+```gdscript
+func _unhandled_input(event: InputEvent) -> void:
+    if event.is_action_pressed("signal_flare"):
+        if GameManager.fire_signal_flare(global_position):
+            NoiseManager.emit_noise(global_position, NoiseManager.Level.GLOBAL)
+            _spawn_signal_flare_marker()
+        return
+
+    for i in 8:
+        if event.is_action_pressed("use_slot_%d" % (i + 1)):
+            $Inventory.use_slot(i)
+            return
 ```
 
 ---
@@ -215,6 +258,8 @@ func heal(amount: float) -> void:
 ## 3. 物品与容器系统
 
 ### 3.1 ItemData (Resource)
+
+`ItemData` 只记录物品自身数值。侵蚀是 `GameManager` 持有的全局局内压力，不作为物品字段。
 
 ```gdscript
 # item_data.gd
@@ -248,18 +293,17 @@ Container (StaticBody2D)
 # container.gd
 extends StaticBody2D
 
-signal cracked(container)
+signal cracked(container: StaticBody2D)
+
+const ITEM_PICKUP_SCENE := preload("res://scenes/item_pickup.tscn")
 
 @export var loot_table: Array[ItemData]
 @export var base_crack_time := 2.0
+@export var pickup_spread_radius := 65.0
 
 var is_cracked := false
-var current_loot: ItemData
 var crack_progress := 0.0
 var is_cracking := false
-
-func _ready() -> void:
-    current_loot = loot_table.pick_random()
 
 func get_crack_duration() -> float:
     var erosion := GameManager.player_erosion / 100.0
@@ -284,10 +328,18 @@ func complete_crack() -> void:
     is_cracked = true
     NoiseManager.emit_noise(global_position, NoiseManager.Level.LOW)
     cracked.emit(self)
+    spawn_pickups()
 
 func interrupt() -> void:
     is_cracking = false
     crack_progress = 0.0
+
+func spawn_pickups() -> void:
+    for item in loot_table:
+        var pickup := ITEM_PICKUP_SCENE.instantiate()
+        pickup.item_data = item
+        get_tree().current_scene.add_child(pickup)
+        pickup.global_position = global_position + Vector2.RIGHT.rotated(randf() * TAU) * pickup_spread_radius
 ```
 
 ### 3.3 背包
@@ -296,33 +348,77 @@ func interrupt() -> void:
 # inventory.gd
 extends Node
 
-var carried_items: Array[ItemData] = []
-var current_weight := 0.0
+const SLOT_COUNT := 8
+
+signal inventory_changed(slots: Array, current_weight: float, max_weight: float)
+signal pickup_blocked(reason: String)
+signal collectible_changed(count: int, score: int)
+signal use_blocked(reason: String)
+
+var slots: Array[ItemData] = []
+
+func _ready() -> void:
+    slots.resize(SLOT_COUNT)
 
 func can_pickup(item: ItemData) -> bool:
-    if current_weight + item.weight > GameManager.max_weight:
+    if get_current_weight() + item.weight > GameManager.max_weight:
         return false
     if GameManager.player_erosion >= GameManager.max_erosion:
         return false
+    if _find_empty_slot() < 0:
+        return false
     return true
 
-func pickup(item: ItemData) -> void:
+func add_item(item: ItemData) -> bool:
     if not can_pickup(item):
-        return
-    current_weight += item.weight
-    carried_items.append(item)
+        return false
+    slots[_find_empty_slot()] = item
+    inventory_changed.emit(slots, get_current_weight(), GameManager.max_weight)
+    collectible_changed.emit(get_collectible_count(), calculate_score())
+    return true
+
+func use_slot(idx: int) -> bool:
+    var item := slots[idx]
+    if item == null:
+        return false
     match item.type:
+        ItemData.Type.COLLECTIBLE:
+            use_blocked.emit("残响碎片仅在撤离时计分")
+            return false
         ItemData.Type.AMMO:
             %PlayerShooting.add_ammo(item.ammo_amount)
         ItemData.Type.BATTERY:
             %PlayerHealth.heal(item.heal_amount)
         ItemData.Type.PURIFIER:
             GameManager.reduce_erosion(item.purify_amount)
+    slots[idx] = null
+    inventory_changed.emit(slots, get_current_weight(), GameManager.max_weight)
+    return true
+
+func get_current_weight() -> float:
+    var weight := 0.0
+    for item in slots:
+        if item != null:
+            weight += item.weight
+    return weight
+
+func get_collectible_count() -> int:
+    var count := 0
+    for item in slots:
+        if item != null and item.type == ItemData.Type.COLLECTIBLE:
+            count += 1
+    return count
+
+func _find_empty_slot() -> int:
+    for i in slots.size():
+        if slots[i] == null:
+            return i
+    return -1
 
 func calculate_score() -> int:
     var score := 0
-    for item in carried_items:
-        if item.type == ItemData.Type.COLLECTIBLE:
+    for item in slots:
+        if item != null and item.type == ItemData.Type.COLLECTIBLE:
             score += item.score_value
     return score
 ```
@@ -375,17 +471,14 @@ var current_alert := 0.0
 var is_awake := false
 var erosion_tier := 0
 
-# 侵蚀属性倍率表（由 SpawnManager 定义，这里引用）
-const EROSION_STAT_MULTIPLIER := [1.0, 1.0, 1.1, 1.2, 1.35]
-
 func _ready() -> void:
     add_to_group("enemies")
 
 func get_scaled_hp() -> float:
-    return base_hp * EROSION_STAT_MULTIPLIER[erosion_tier]
+    return base_hp * GameManager.EROSION_STAT_MULTIPLIER[erosion_tier]
 
 func get_scaled_damage() -> float:
-    return base_damage * EROSION_STAT_MULTIPLIER[erosion_tier]
+    return base_damage * GameManager.EROSION_STAT_MULTIPLIER[erosion_tier]
 
 func receive_noise(value: float) -> void:
     if is_awake:
@@ -503,7 +596,7 @@ extends "res://scripts/enemies/enemy_base.gd"
 enum State { SLEEP, CHASE, ATTACK }
 
 @export var chase_speed := 150.0
-@export var base_attack_range := 80.0
+@export var melee_range := 80.0
 @export var attack_cooldown := 1.5
 
 var state := State.SLEEP
@@ -521,7 +614,7 @@ func _physics_process(_delta: float) -> void:
             pass  # 不动
         State.CHASE:
             var dist := global_position.distance_to(player.global_position)
-            if dist <= base_attack_range:
+            if dist <= melee_range:
                 state = State.ATTACK
             else:
                 velocity = global_position.direction_to(player.global_position) * chase_speed
@@ -531,7 +624,7 @@ func _physics_process(_delta: float) -> void:
             if attack_timer <= 0:
                 player.get_node("PlayerHealth").take_damage(get_scaled_damage())
                 attack_timer = attack_cooldown
-            if global_position.distance_to(player.global_position) > base_attack_range * 1.5:
+            if global_position.distance_to(player.global_position) > melee_range * 1.5:
                 state = State.CHASE
 ```
 
@@ -542,7 +635,7 @@ func _physics_process(_delta: float) -> void:
 ### 6.1 侵蚀→敌人倍率映射
 
 ```gdscript
-# 侵蚀阶梯影响——由 GameManager.get_erosion_tier() 驱动
+# 侵蚀阶梯影响——常量定义在 GameManager，由 GameManager.get_erosion_tier() 驱动
 
 # 敌人属性倍率 (HP / 伤害)
 const EROSION_STAT_MULTIPLIER := [1.0, 1.0, 1.1, 1.2, 1.35]
@@ -585,7 +678,7 @@ func _process(delta: float) -> void:
     var spm := sample_curve(elapsed)
     if signal_active:
         spm *= signal_flare_multiplier
-    spm /= EROSION_SPAWN_INTERVAL_MULTIPLIER[tier]
+    spm /= GameManager.EROSION_SPAWN_INTERVAL_MULTIPLIER[tier]
     var interval := 60.0 / maxf(spm, 0.1)
     spawn_timer -= delta
     if spawn_timer <= 0:
@@ -594,7 +687,7 @@ func _process(delta: float) -> void:
 
 func spawn_enemy(elapsed: float, tier: int) -> void:
     var point := get_farthest_spawn_point()
-    var spawn_dormant := elapsed > 60 and randf() < EROSION_DORMANT_RATIO[tier]
+    var spawn_dormant := elapsed > 60 and randf() < GameManager.EROSION_DORMANT_RATIO[tier]
     var scene := dormant_scene if spawn_dormant else patrol_scene
     var enemy := scene.instantiate()
     enemy.global_position = point.global_position
@@ -704,6 +797,13 @@ func _process(_delta: float) -> void:
 
 ## 9. 撤离系统
 
+当前已落地的部分：
+- 玩家按 `signal_flare` 时调用 `GameManager.fire_signal_flare(global_position)`
+- `GameManager` 记录信号弹位置和时间，切换到 `EXTRACTING`
+- 玩家同时通过 `NoiseManager.emit_noise(..., GLOBAL)` 发出全图噪音，并生成短暂视觉标记
+
+Day 4 需要补齐的部分是等待计时、母车到达、登车成功和撤离阶段刷怪联动。建议让 `Extraction` 监听 `GameManager.signal_flare_fired`，而不是自己直接处理输入。
+
 ```gdscript
 # extraction.gd
 extends Node2D
@@ -712,25 +812,22 @@ extends Node2D
 @export var mothership_scene: PackedScene
 @export var boarding_range := 100.0
 
-var signal_fired := false
 var wait_timer := 0.0
 var signal_position: Vector2
 var mothership: Node2D
 
-func _unhandled_input(event: InputEvent) -> void:
-    if event.is_action_pressed("signal_flare") and not signal_fired:
-        fire_signal()
+func _ready() -> void:
+    GameManager.signal_flare_fired.connect(_on_signal_flare_fired)
 
-func fire_signal() -> void:
-    signal_fired = true
-    signal_position = GameManager.player_position
+func _on_signal_flare_fired(origin: Vector2) -> void:
+    signal_position = origin
     wait_timer = wait_time
-    NoiseManager.emit_noise(signal_position, NoiseManager.Level.GLOBAL)
-    $"../SpawnManager".on_signal_flare()
-    GameManager.set_state(GameManager.State.EXTRACTING)
+    var spawn_manager := get_node_or_null("../SpawnManager")
+    if spawn_manager and spawn_manager.has_method("on_signal_flare"):
+        spawn_manager.on_signal_flare()
 
 func _process(delta: float) -> void:
-    if not signal_fired:
+    if GameManager.current_state != GameManager.State.EXTRACTING:
         return
     wait_timer -= delta
     if wait_timer <= 0 and mothership == null:
@@ -751,46 +848,97 @@ func _process(delta: float) -> void:
 # game_manager.gd — 注册为 Autoload
 extends Node
 
+signal state_changed(new_state: State)
+signal erosion_changed(value: float)
+signal erosion_tier_changed(tier: int)
+signal signal_flare_fired(origin: Vector2)
+signal run_finished(final_state: State)
+
 enum State { PREPARING, RUNNING, EXTRACTING, SUCCESS, DEAD }
 
-var current_state := State.PREPARING
-var elapsed_time := 0.0
-var player_erosion := 0.0
-var max_weight := 50.0
-var max_erosion := 100.0
-var player_position: Vector2
-var kill_count := 0
+const EROSION_RATE := 0.0167
+const HIT_EROSION_AMOUNT := 2.5
+const PURIFIER_REDUCTION := 17.5
 
-# 侵蚀增长速率（每秒百分比）
-const EROSION_RATE := 0.0167  # 约每 60 秒 +1%
-const HIT_EROSION_AMOUNT := 2.5  # 受击跳升 %
-const PURIFIER_REDUCTION := 17.5  # 净化剂降低 %
+const EROSION_STAT_MULTIPLIER := [1.0, 1.0, 1.1, 1.2, 1.35]
+const EROSION_SPAWN_INTERVAL_MULTIPLIER := [1.0, 1.0, 0.85, 0.7, 0.5]
+const EROSION_DORMANT_RATIO := [0.0, 0.0, 0.15, 0.3, 0.5]
+
+var current_state: State = State.PREPARING
+var elapsed_time: float = 0.0
+var player_erosion: float = 0.0
+var max_weight: float = 50.0
+var max_erosion: float = 100.0
+var player_position: Vector2 = Vector2.ZERO
+var kill_count: int = 0
+var signal_flare_used: bool = false
+var signal_flare_position: Vector2 = Vector2.ZERO
+var signal_flare_time: float = -1.0
+
+var _last_tier: int = 0
 
 func _process(delta: float) -> void:
     if current_state == State.RUNNING or current_state == State.EXTRACTING:
         elapsed_time += delta
         add_erosion(EROSION_RATE * delta)
 
+func start_run() -> void:
+    reset_run()
+    set_state(State.RUNNING)
+
+func reset_run() -> void:
+    elapsed_time = 0.0
+    player_erosion = 0.0
+    kill_count = 0
+    signal_flare_used = false
+    signal_flare_position = Vector2.ZERO
+    signal_flare_time = -1.0
+    _last_tier = 0
+    erosion_changed.emit(player_erosion)
+
 func set_state(new_state: State) -> void:
+    if current_state == new_state:
+        return
     current_state = new_state
+    state_changed.emit(new_state)
     match new_state:
-        State.SUCCESS:
-            get_tree().change_scene_to_file("res://scenes/result_screen.tscn")
-        State.DEAD:
-            get_tree().change_scene_to_file("res://scenes/result_screen.tscn")
+        State.SUCCESS, State.DEAD:
+            run_finished.emit(new_state)
+
+func fire_signal_flare(origin: Vector2) -> bool:
+    if current_state != State.RUNNING or signal_flare_used:
+        return false
+    signal_flare_used = true
+    signal_flare_position = origin
+    signal_flare_time = elapsed_time
+    signal_flare_fired.emit(origin)
+    set_state(State.EXTRACTING)
+    return true
 
 func add_erosion(amount: float) -> void:
-    player_erosion = minf(player_erosion + amount, max_erosion)
+    var prev := player_erosion
+    player_erosion = clampf(player_erosion + amount, 0.0, max_erosion)
+    if player_erosion != prev:
+        erosion_changed.emit(player_erosion)
+        _check_tier_change()
 
 func reduce_erosion(amount: float) -> void:
-    player_erosion = maxf(player_erosion - amount, 0.0)
+    add_erosion(-amount)
 
 func get_erosion_tier() -> int:
-    ## 返回侵蚀阶梯 0-4
     if player_erosion < 25: return 0
     if player_erosion < 50: return 1
     if player_erosion < 75: return 2
     return 3 if player_erosion < 100 else 4
+
+func _check_tier_change() -> void:
+    var tier := get_erosion_tier()
+    if tier != _last_tier:
+        _last_tier = tier
+        erosion_tier_changed.emit(tier)
+
+func register_kill() -> void:
+    kill_count += 1
 ```
 
 ---
@@ -808,6 +956,7 @@ func get_erosion_tier() -> int:
 | `sprint` | Left Shift |
 | `signal_flare` | Q |
 | `pause` | Escape |
+| `use_slot_1` ~ `use_slot_8` | 1 ~ 8 |
 
 ---
 

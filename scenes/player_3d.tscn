@@ -1,0 +1,52 @@
+[gd_scene load_steps=9 format=3 uid="uid://player3d00001"]
+
+[ext_resource type="Script" path="res://scripts/player/player_3d.gd" id="1_player3d"]
+[ext_resource type="Script" path="res://scripts/player/player_shooting_3d.gd" id="2_shooting3d"]
+[ext_resource type="PackedScene" path="res://scenes/bullet_3d.tscn" id="3_bullet3d"]
+[ext_resource type="Script" path="res://scripts/player/player_health.gd" id="4_health"]
+[ext_resource type="Script" path="res://scripts/player/inventory.gd" id="5_inventory"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
+radius = 0.35
+height = 1.55
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
+radius = 0.35
+height = 1.45
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_player"]
+albedo_color = Color(0.24, 0.74, 0.5, 1)
+roughness = 0.7
+
+[node name="Player3D" type="CharacterBody3D" groups=["player"]]
+collision_layer = 1
+collision_mask = 22
+script = ExtResource("1_player3d")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 0.8, 0)
+shape = SubResource("CapsuleShape3D_player")
+
+[node name="BodyVisual" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.82, 0)
+mesh = SubResource("CapsuleMesh_player")
+material_override = SubResource("StandardMaterial3D_player")
+
+[node name="GunPivot" type="Node3D" parent="."]
+
+[node name="FirePoint" type="Marker3D" parent="GunPivot"]
+unique_name_in_owner = true
+position = Vector3(0, 1.0, -0.9)
+
+[node name="PlayerShooting" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("2_shooting3d")
+bullet_scene = ExtResource("3_bullet3d")
+
+[node name="PlayerHealth" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("4_health")
+
+[node name="Inventory" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("5_inventory")

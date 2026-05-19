@@ -7,6 +7,8 @@ extends Node
 signal state_changed(new_state: State)
 signal erosion_changed(value: float)
 signal erosion_tier_changed(tier: int)
+signal signal_flare_fired(origin: Vector3)
+signal run_finished(final_state: State)
 
 # ----- 枚举 -----
 enum State { PREPARING, RUNNING, EXTRACTING, SUCCESS, DEAD }
@@ -27,8 +29,11 @@ var elapsed_time: float = 0.0
 var player_erosion: float = 0.0
 var max_weight: float = 50.0
 var max_erosion: float = 100.0
-var player_position: Vector2 = Vector2.ZERO
+var player_position: Vector3 = Vector3.ZERO
 var kill_count: int = 0
+var signal_flare_used: bool = false
+var signal_flare_position: Vector3 = Vector3.ZERO
+var signal_flare_time: float = -1.0
 
 var _last_tier: int = 0
 
@@ -36,8 +41,8 @@ var _last_tier: int = 0
 func _process(delta: float) -> void:
 	if current_state == State.RUNNING or current_state == State.EXTRACTING:
 		elapsed_time += delta
-		add_erosion(EROSION_RATE * delta * 100.0)
-		# 注：EROSION_RATE 单位是「每秒百分点」(0.0167 ≈ 1%/60s)，×100 换算成 0-100 区间
+		add_erosion(EROSION_RATE * delta)
+		# EROSION_RATE 单位是「每秒百分点」(0.0167 ≈ 1%/60s)
 
 
 func start_run() -> void:
@@ -50,6 +55,9 @@ func reset_run() -> void:
 	elapsed_time = 0.0
 	player_erosion = 0.0
 	kill_count = 0
+	signal_flare_used = false
+	signal_flare_position = Vector3.ZERO
+	signal_flare_time = -1.0
 	_last_tier = 0
 	erosion_changed.emit(player_erosion)
 
@@ -63,7 +71,20 @@ func set_state(new_state: State) -> void:
 		State.SUCCESS, State.DEAD:
 			# TODO Day 5：跳转结算场景
 			# get_tree().change_scene_to_file("res://scenes/result_screen.tscn")
-			pass
+			run_finished.emit(new_state)
+
+
+func fire_signal_flare(origin: Vector3) -> bool:
+	if current_state != State.RUNNING:
+		return false
+	if signal_flare_used:
+		return false
+	signal_flare_used = true
+	signal_flare_position = origin
+	signal_flare_time = elapsed_time
+	signal_flare_fired.emit(origin)
+	set_state(State.EXTRACTING)
+	return true
 
 
 func add_erosion(amount: float) -> void:
