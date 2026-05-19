@@ -19,7 +19,7 @@ func _run() -> void:
 	var manager: Node = root.get_node_or_null("GameManager")
 	_expect(manager != null, "GameManager autoload should exist")
 	if manager != null:
-		_expect(manager.current_state == manager.State.RUNNING, "3D scene should start a run")
+		_expect(manager.current_state == manager.State.PREPARING, "3D scene should wait on the main screen")
 
 	var camera := scene.get_node_or_null("CameraRig/Camera3D") as Camera3D
 	_expect(camera != null, "3D scene should have Camera3D under CameraRig")
@@ -38,6 +38,18 @@ func _run() -> void:
 			_expect(shooting._bullet_pool.size() >= 8, "3D shooting should prebuild a bullet pool")
 		_expect(player.get_node_or_null("Inventory") != null, "3D player should keep Inventory")
 
+	var hud := scene.get_node_or_null("UI/HUD")
+	_expect(hud != null, "3D scene should keep HUD")
+	if hud != null:
+		var main_overlay := hud.get_node_or_null("MainOverlay") as Control
+		_expect(main_overlay != null and main_overlay.visible, "HUD should show the main overlay before start")
+
+	if manager != null:
+		manager.start_run()
+		for i in 4:
+			await physics_frame
+		_expect(manager.current_state == manager.State.RUNNING, "start_run() should enter RUNNING")
+
 	var enemies := scene.get_node_or_null("Entities/Enemies")
 	_expect(enemies != null and enemies.get_child_count() > 0, "3D scene should spawn enemies")
 	if enemies != null:
@@ -50,9 +62,6 @@ func _run() -> void:
 
 	var containers := scene.get_node_or_null("Entities/Containers")
 	_expect(containers != null and containers.get_child_count() > 0, "3D scene should spawn containers")
-
-	var hud := scene.get_node_or_null("UI/HUD")
-	_expect(hud != null, "3D scene should keep HUD")
 
 	scene.queue_free()
 	await process_frame

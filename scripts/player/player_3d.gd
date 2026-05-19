@@ -20,8 +20,8 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if (
-		GameManager.current_state == GameManager.State.DEAD
-		or GameManager.current_state == GameManager.State.SUCCESS
+		GameManager.current_state != GameManager.State.RUNNING
+		and GameManager.current_state != GameManager.State.EXTRACTING
 	):
 		velocity = Vector3.ZERO
 		return

@@ -39,7 +39,7 @@ mouse_filter = 2
 [node name="ErosionLabel" type="Label" parent="TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "侵蚀  0%"
+text = "Erosion  0%"
 
 [node name="ErosionBar" type="ProgressBar" parent="TopLeft"]
 unique_name_in_owner = true
@@ -57,7 +57,7 @@ mouse_filter = 2
 [node name="WeightLabel" type="Label" parent="TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "负重  0 / 50"
+text = "Weight  0 / 50"
 
 [node name="TopRight" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -72,19 +72,19 @@ mouse_filter = 2
 [node name="AmmoLabel" type="Label" parent="TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "弹药  60 / 60"
+text = "Ammo  60 / 60"
 horizontal_alignment = 2
 
 [node name="ScoreLabel" type="Label" parent="TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "分数  0"
+text = "Score  0"
 horizontal_alignment = 2
 
 [node name="CollectibleLabel" type="Label" parent="TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "残响  0"
+text = "Collectibles  0"
 horizontal_alignment = 2
 
 [node name="BottomBar" type="HBoxContainer" parent="."]
@@ -111,9 +111,9 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -160.0
+offset_left = -190.0
 offset_top = -100.0
-offset_right = 160.0
+offset_right = 190.0
 offset_bottom = -70.0
 grow_horizontal = 2
 grow_vertical = 2

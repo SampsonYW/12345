@@ -46,6 +46,31 @@ Assert-Contains `
 	-Message "GameManager must expose fire_signal_flare(origin) for the player input layer."
 
 Assert-Contains `
+	-Path $gameManager `
+	-Pattern "if current_state == State\.SUCCESS or current_state == State\.DEAD:[\s\S]*return" `
+	-Message "Terminal run states must not be overwritten after success or death."
+
+Assert-Contains `
+	-Path $gameManager `
+	-Pattern "func reset_run\(\) -> void:[\s\S]*current_state = State\.PREPARING" `
+	-Message "reset_run() must clear terminal state so Restart can return to the main screen."
+
+Assert-Contains `
+	-Path $gameManager `
+	-Pattern "func request_start_after_reload\(\) -> void:[\s\S]*start_after_reload = true" `
+	-Message "GameManager must support returning to the home page before starting a fresh scene-backed run."
+
+Assert-Contains `
+	-Path $hud `
+	-Pattern "func _update_end_flow\(state: int\) -> void:[\s\S]*_result_overlay\.visible = true" `
+	-Message "Terminal results must show the standalone result overlay first."
+
+Assert-Contains `
+	-Path $hud `
+	-Pattern "func _return_to_home_from_result\(\) -> void:[\s\S]*_show_main_overlay\(true\)" `
+	-Message "Result overlay must provide a path back to the home page."
+
+Assert-Contains `
 	-Path $player `
 	-Pattern 'event\.is_action_pressed\("signal_flare"\)' `
 	-Message "Player must listen for the signal_flare action."

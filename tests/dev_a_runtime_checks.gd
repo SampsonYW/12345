@@ -43,6 +43,15 @@ func _init() -> void:
 
 	manager.set_state(manager.State.DEAD)
 	_expect(counters.finished_count == 1, "Terminal state should emit run_finished")
+	manager.set_state(manager.State.RUNNING)
+	_expect(manager.current_state == manager.State.DEAD, "Terminal state should ignore non-reset transitions")
+	manager.reset_run()
+	_expect(manager.current_state == manager.State.PREPARING, "reset_run() should leave terminal state for restart")
+	manager.request_start_after_reload()
+	_expect(manager.consume_start_after_reload(), "start-after-reload request should be consumed once")
+	_expect(not manager.consume_start_after_reload(), "start-after-reload request should clear after consume")
+	manager.start_run()
+	_expect(manager.current_state == manager.State.RUNNING, "start_run() should work after terminal reset")
 	manager.free()
 
 	if _failures.is_empty():

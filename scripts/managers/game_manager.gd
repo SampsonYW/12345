@@ -34,6 +34,7 @@ var kill_count: int = 0
 var signal_flare_used: bool = false
 var signal_flare_position: Vector3 = Vector3.ZERO
 var signal_flare_time: float = -1.0
+var start_after_reload: bool = false
 
 var _last_tier: int = 0
 
@@ -52,6 +53,8 @@ func start_run() -> void:
 
 
 func reset_run() -> void:
+	var previous_state := current_state
+	current_state = State.PREPARING
 	elapsed_time = 0.0
 	player_erosion = 0.0
 	kill_count = 0
@@ -60,10 +63,25 @@ func reset_run() -> void:
 	signal_flare_time = -1.0
 	_last_tier = 0
 	erosion_changed.emit(player_erosion)
+	if previous_state != current_state:
+		state_changed.emit(current_state)
+
+
+func request_start_after_reload() -> void:
+	start_after_reload = true
+
+
+func consume_start_after_reload() -> bool:
+	if not start_after_reload:
+		return false
+	start_after_reload = false
+	return true
 
 
 func set_state(new_state: State) -> void:
 	if current_state == new_state:
+		return
+	if current_state == State.SUCCESS or current_state == State.DEAD:
 		return
 	current_state = new_state
 	state_changed.emit(new_state)

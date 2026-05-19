@@ -7,6 +7,7 @@ const PLAYER_SCENE := preload("res://scenes/player_3d.tscn")
 const PATROL_ENEMY_SCENE := preload("res://scenes/patrol_enemy_3d.tscn")
 const DORMANT_ENEMY_SCENE := preload("res://scenes/dormant_enemy_3d.tscn")
 const CONTAINER_SCENE := preload("res://scenes/container_3d.tscn")
+const EXTRACTION_SCRIPT := preload("res://scripts/systems/extraction.gd")
 
 const ITEM_RELIC := preload("res://resources/items/relic_small.tres")
 const ITEM_AMMO := preload("res://resources/items/standard_ammo.tres")
@@ -23,6 +24,7 @@ const OBSTACLE_DATA := [
 ]
 
 var _player: Node3D = null
+var _enemies_spawned: bool = false
 
 @onready var _camera: Camera3D = $CameraRig/Camera3D
 @onready var _enemies: Node3D = $Entities/Enemies
@@ -34,8 +36,11 @@ func _ready() -> void:
 	_spawn_player()
 	_spawn_obstacles()
 	_spawn_containers()
-	_spawn_enemies()
-	GameManager.start_run()
+	_add_extraction_system()
+	if not GameManager.state_changed.is_connected(_on_game_state_changed):
+		GameManager.state_changed.connect(_on_game_state_changed)
+	if GameManager.current_state == GameManager.State.RUNNING:
+		_spawn_enemies()
 	_update_camera()
 
 
@@ -91,6 +96,9 @@ func _spawn_containers() -> void:
 
 
 func _spawn_enemies() -> void:
+	if _enemies_spawned:
+		return
+	_enemies_spawned = true
 	var patrol_positions := [Vector3(9.0, 0.0, -12.0), Vector3(-12.0, 0.0, 10.0)]
 	var dormant_positions := [Vector3(14.0, 0.0, 7.0), Vector3(-14.0, 0.0, -7.0)]
 	for pos in patrol_positions:
@@ -101,6 +109,20 @@ func _spawn_enemies() -> void:
 		var enemy: Node3D = DORMANT_ENEMY_SCENE.instantiate()
 		enemy.position = pos
 		_enemies.add_child(enemy)
+
+
+func _on_game_state_changed(new_state: int) -> void:
+	if new_state == GameManager.State.RUNNING:
+		_spawn_enemies()
+
+
+func _add_extraction_system() -> void:
+	if get_node_or_null("Extraction") != null:
+		return
+	var extraction := Node3D.new()
+	extraction.name = "Extraction"
+	extraction.set_script(EXTRACTION_SCRIPT)
+	add_child(extraction)
 
 
 func _update_camera() -> void:
