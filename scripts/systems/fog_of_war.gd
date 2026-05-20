@@ -10,12 +10,14 @@ const EXPLORED_MARKER_SCENE := preload("res://scenes/explored_marker.tscn")
 @export var trail_interval: float = 0.35
 @export var trail_radius_scale: float = 0.72
 @export var max_trail_markers: int = 28
+@export var fog_height: float = 0.15
 
 var _current_radius: float = 8.0
 var _trail_timer: float = 0.0
 var _player: Node3D = null
 var _vision_disc: MeshInstance3D = null
 var _trail_parent: Node3D = null
+var _fog_mask: MeshInstance3D = null
 
 
 func _ready() -> void:
@@ -31,6 +33,14 @@ func _process(delta: float) -> void:
 	_current_radius = lerpf(base_radius, min_radius, erosion_ratio)
 	_vision_disc.global_position = _ground_position(_player.global_position, 0.035)
 	_vision_disc.scale = Vector3(_current_radius, 1.0, _current_radius)
+	
+	if _fog_mask != null:
+		_fog_mask.global_position = Vector3(_player.global_position.x, fog_height, _player.global_position.z)
+		var mat := _fog_mask.material_override as ShaderMaterial
+		if mat != null:
+			mat.set_shader_parameter("player_position", _player.global_position)
+			mat.set_shader_parameter("vision_radius", _current_radius)
+			
 	_trail_timer -= delta
 	if _trail_timer <= 0.0:
 		_trail_timer = trail_interval
@@ -67,6 +77,28 @@ func _build_nodes() -> void:
 		_vision_disc.mesh = _make_disc_mesh()
 		_vision_disc.material_override = _make_material(Color(0.5, 0.95, 0.75, 0.20), Color(0.1, 0.8, 0.45, 1.0), 0.18)
 		add_child(_vision_disc)
+
+	if DisplayServer.get_name() != "headless":
+		_fog_mask = get_node_or_null("FogMask") as MeshInstance3D
+		if _fog_mask == null:
+			_fog_mask = MeshInstance3D.new()
+			_fog_mask.name = "FogMask"
+			var mesh := PlaneMesh.new()
+			mesh.size = Vector2(1000.0, 1000.0)
+			_fog_mask.mesh = mesh
+			_fog_mask.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			
+			# Load shader
+			var shader = load("res://shaders/fog_mask.gdshader") as Shader
+			if shader != null:
+				var mat := ShaderMaterial.new()
+				mat.shader = shader
+				mat.set_shader_parameter("player_position", Vector3.ZERO)
+				mat.set_shader_parameter("vision_radius", 8.0)
+				mat.set_shader_parameter("fog_opacity", 0.65)
+				mat.set_shader_parameter("fog_color", Color(0.05, 0.06, 0.08, 1.0))
+				_fog_mask.material_override = mat
+			add_child(_fog_mask)
 
 
 func _bind_player() -> void:
