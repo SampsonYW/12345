@@ -39,10 +39,10 @@ shadow_enabled = true
 
 [node name="WorldPrompt" type="Label3D" parent="World"]
 visible = false
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 0, 0.08, 0)
+transform = Transform3D(1, 0, 0, 0, 0.65090686, 0.7591574, 0, -0.7591574, 0.65090686, 0, 0.17, 0)
 modulate = Color(0.96, 0.92, 0.68, 1)
 text = ""
-font_size = 38
+font_size = 128
 outline_size = 4
 outline_modulate = Color(0.03, 0.04, 0.035, 0.85)
 

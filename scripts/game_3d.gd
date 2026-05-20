@@ -240,10 +240,10 @@ func _build_afterglow_map() -> void:
 	_add_static_collision_box(_afterglow_map, "WarehouseCollision", Vector3(-31.0, 1.0, 13.0), Vector3(7.0, 2.0, 5.0))
 	_add_visual_box(_afterglow_map, "DepartureDoor", Vector3(32.0, 1.3, 19.0), Vector3(9.0, 2.6, 1.0), Color(0.32, 0.42, 0.50, 1.0))
 	_add_afterglow_point("WarehousePoint", Vector3(-31.0, 0.1, 7.0), Color(0.9, 0.62, 0.22, 1.0))
-	_add_afterglow_point("DeparturePoint", Vector3(32.0, 0.1, 4.5), Color(0.38, 0.78, 1.0, 1.0))
+	_add_afterglow_point("DeparturePoint", Vector3(32.0, 0.1, 10.0), Color(0.38, 0.78, 1.0, 1.0))
 	_add_label3d(_afterglow_map, "ControlsHint", "WASD Move  E Interact  B Backpack  Q Signal Flare", Vector3(0.0, 0.08, -2.0), Color(0.84, 0.92, 0.88, 1.0))
-	_add_label3d(_afterglow_map, "WarehouseHint", "E Open Storage", Vector3(-31.0, 0.08, 0.5), Color(1.0, 0.76, 0.35, 1.0))
-	_add_label3d(_afterglow_map, "DepartureHint", "Hold E Depart", Vector3(32.0, 0.08, 0.5), Color(0.58, 0.86, 1.0, 1.0))
+	_add_label3d(_afterglow_map, "WarehouseHint", "E Open Storage", Vector3(-31.0, 0.17, 9.0), Color(1.0, 0.76, 0.35, 1.0))
+	_add_label3d(_afterglow_map, "DepartureHint", "Hold E Depart", Vector3(32.0, 0.17, 12.0), Color(0.58, 0.86, 1.0, 1.0))
 	_add_label3d(_afterglow_map, "CockpitHint", "AFTERGLOW EXPRESS", Vector3(0.0, 0.08, -24.0), Color(0.93, 0.88, 0.68, 1.0))
 
 
@@ -384,7 +384,7 @@ func _apply_location(location: int) -> void:
 		if _player != null:
 			_player.global_position = Vector3(0.0, 0.0, 5.0)
 			GameManager.player_position = _player.global_position
-		_set_prompt_text("WASD Move  E Interact  B Backpack  Q Signal Flare")
+		_set_prompt_text("")
 		_set_risk_label_text("Afterglow Express")
 	elif location == GameManager.Location.EXPEDITION:
 		if _player != null:
@@ -410,16 +410,19 @@ func _update_afterglow_interactions(delta: float) -> void:
 	if nearby == "warehouse":
 		_departure_hold = 0.0
 		var warehouse_point := _get_afterglow_point("warehouse")
-		_set_prompt_text("E Open Storage", warehouse_point.global_position if warehouse_point != null else _player.global_position)
+		if _hud != null and _hud.has_method("set_prompt_text"):
+			_hud.set_prompt_text("E Open Storage")
+		if _world_prompt != null:
+			_world_prompt.visible = false
 		if Input.is_action_pressed("interact") and not GameManager.ui_blocking_input:
 			if _hud != null and _hud.has_method("open_storage"):
 				_hud.open_storage()
 	elif nearby == "departure":
 		var departure_point := _get_afterglow_point("departure")
-		var prompt_position := departure_point.global_position if departure_point != null else _player.global_position
+		var prompt_position := Vector3(32.0, 0.17, 12.0)
 		if GameManager.ui_blocking_input:
 			_departure_hold = 0.0
-			_set_prompt_text("Hold E Depart", prompt_position)
+			_set_prompt_text("")
 			return
 		if Input.is_action_pressed("interact"):
 			_departure_hold += delta
@@ -429,10 +432,10 @@ func _update_afterglow_interactions(delta: float) -> void:
 				_begin_expedition_from_afterglow()
 		else:
 			_departure_hold = 0.0
-			_set_prompt_text("Hold E Depart", prompt_position)
+			_set_prompt_text("")
 	else:
 		_departure_hold = 0.0
-		_set_prompt_text("WASD Move  E Interact  B Backpack  Q Signal Flare", _player.global_position + Vector3(0.0, 0.0, 2.8))
+		_set_prompt_text("")
 
 
 func _find_nearby_afterglow_point() -> String:
@@ -550,7 +553,15 @@ func _set_prompt_text(text: String, world_position: Vector3 = Vector3.INF) -> vo
 		var target_position := world_position
 		if target_position == Vector3.INF:
 			target_position = _player.global_position + Vector3(0.0, 0.0, 2.8) if _player != null else Vector3.ZERO
-		_world_prompt.global_position = Vector3(target_position.x, 0.09, target_position.z)
+		var target_y := target_position.y
+		if world_position == Vector3.INF:
+			target_y = 0.09
+		else:
+			if target_y <= 0.0:
+				target_y = 0.09
+			else:
+				target_y = target_y + 0.01
+		_world_prompt.global_position = Vector3(target_position.x, target_y, target_position.z)
 
 
 func _set_risk_label_text(text: String) -> void:
@@ -604,8 +615,8 @@ func _add_label3d(parent: Node3D, node_name: String, text: String, position: Vec
 	label.name = node_name
 	label.text = text
 	label.position = position
-	label.rotation_degrees = Vector3(-65.0, 0.0, 0.0)
-	label.font_size = 32
+	label.rotation_degrees = Vector3(49.5, 0.0, 0.0)
+	label.font_size = 128
 	label.modulate = color
 	parent.add_child(label)
 

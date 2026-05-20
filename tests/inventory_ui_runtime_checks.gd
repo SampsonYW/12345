@@ -84,8 +84,8 @@ func _run() -> void:
 	await process_frame
 	if hud.has_method("get_prompt_text"):
 		_expect(hud.get_prompt_text().find("Storage") >= 0, "Warehouse prompt appears in range")
-	var world_prompt := scene.get_node_or_null("World/WorldPrompt") as Label3D
-	_expect(world_prompt != null and world_prompt.visible and world_prompt.text.find("Storage") >= 0, "Warehouse prompt renders as world-space ground text")
+	var warehouse_hint := scene.get_node_or_null("World/AfterglowMap/WarehouseHint") as Label3D
+	_expect(warehouse_hint != null and warehouse_hint.visible and warehouse_hint.text.find("Storage") >= 0, "Warehouse prompt renders as world-space ground text")
 	_expect(scene.get_node_or_null("World/AfterglowMap/WarehouseCollision") != null, "Warehouse has physical collision")
 	_expect(hud.has_method("transfer_storage_item_to_backpack"), "Storage UI exposes warehouse-to-backpack transfer")
 	_expect(hud.has_method("transfer_backpack_slot_to_storage"), "Storage UI exposes backpack-to-warehouse transfer")

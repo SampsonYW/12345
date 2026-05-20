@@ -1,65 +1,61 @@
 [gd_scene format=3 uid="uid://du6oaysi500nc"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_deck"]
-albedo_color = Color(0.16, 0.20, 0.18, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Mat_cockpit"]
-albedo_color = Color(0.18, 0.28, 0.30, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Mat_rest"]
-albedo_color = Color(0.20, 0.23, 0.18, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Mat_warehouse_floor"]
-albedo_color = Color(0.28, 0.22, 0.16, 0.42)
-roughness = 0.82
-transparency = 1
-
-[sub_resource type="StandardMaterial3D" id="Mat_departure"]
-albedo_color = Color(0.20, 0.24, 0.31, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Mat_crates"]
-albedo_color = Color(0.38, 0.30, 0.20, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Mat_door"]
-albedo_color = Color(0.32, 0.42, 0.50, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Mat_warehouse_marker"]
-albedo_color = Color(0.90, 0.62, 0.22, 1)
-roughness = 0.82
-
-[sub_resource type="StandardMaterial3D" id="Mat_departure_marker"]
-albedo_color = Color(0.38, 0.78, 1, 1)
+albedo_color = Color(0.16, 0.2, 0.18, 1)
 roughness = 0.82
 
 [sub_resource type="BoxMesh" id="Box_deck"]
 size = Vector3(92, 0.08, 52)
 
+[sub_resource type="StandardMaterial3D" id="Mat_cockpit"]
+albedo_color = Color(0.18, 0.28, 0.3, 1)
+roughness = 0.82
+
 [sub_resource type="BoxMesh" id="Box_cockpit"]
 size = Vector3(34, 0.16, 12)
+
+[sub_resource type="StandardMaterial3D" id="Mat_rest"]
+albedo_color = Color(0.2, 0.23, 0.18, 1)
+roughness = 0.82
 
 [sub_resource type="BoxMesh" id="Box_rest"]
 size = Vector3(30, 0.16, 18)
 
+[sub_resource type="StandardMaterial3D" id="Mat_warehouse_floor"]
+transparency = 1
+albedo_color = Color(0.28, 0.22, 0.16, 0.42)
+roughness = 0.82
+
 [sub_resource type="BoxMesh" id="Box_warehouse_floor"]
 size = Vector3(20, 0.16, 20)
+
+[sub_resource type="StandardMaterial3D" id="Mat_departure"]
+albedo_color = Color(0.2, 0.24, 0.31, 1)
+roughness = 0.82
 
 [sub_resource type="BoxMesh" id="Box_departure"]
 size = Vector3(19, 0.16, 18)
 
+[sub_resource type="StandardMaterial3D" id="Mat_crates"]
+albedo_color = Color(0.38, 0.3, 0.2, 1)
+roughness = 0.82
+
 [sub_resource type="BoxMesh" id="Box_crates"]
 size = Vector3(7, 2, 5)
+
+[sub_resource type="BoxShape3D" id="Shape_crates"]
+size = Vector3(7, 2, 5)
+
+[sub_resource type="StandardMaterial3D" id="Mat_door"]
+albedo_color = Color(0.32, 0.42, 0.5, 1)
+roughness = 0.82
 
 [sub_resource type="BoxMesh" id="Box_door"]
 size = Vector3(9, 2.6, 1)
 
-[sub_resource type="BoxShape3D" id="Shape_crates"]
-size = Vector3(7, 2, 5)
+[sub_resource type="StandardMaterial3D" id="Mat_warehouse_marker"]
+albedo_color = Color(0.9, 0.62, 0.22, 1)
+roughness = 0.82
 
 [sub_resource type="CylinderMesh" id="Marker_disc"]
 top_radius = 1.05
@@ -67,85 +63,119 @@ bottom_radius = 1.05
 height = 0.08
 radial_segments = 32
 
-[node name="AfterglowMap" type="Node3D"]
+[sub_resource type="StandardMaterial3D" id="Mat_departure_marker"]
+albedo_color = Color(0.38, 0.78, 1, 1)
+roughness = 0.82
 
-[node name="AfterglowDeck" type="MeshInstance3D" parent="."]
-position = Vector3(0, -0.02, 0)
-mesh = SubResource("Box_deck")
+[sub_resource type="FontFile" id="FontFile_plkho"]
+subpixel_positioning = 0
+msdf_pixel_range = 14
+msdf_size = 128
+cache/0/variation_coordinates = {}
+cache/0/face_index = 0
+cache/0/embolden = 0.0
+cache/0/transform = Transform2D(1, 0, 0, 1, 0, 0)
+cache/0/spacing_top = 0
+cache/0/spacing_bottom = 0
+cache/0/spacing_space = 0
+cache/0/spacing_glyph = 0
+cache/0/baseline_offset = 0.0
+cache/0/16/0/ascent = 0.0
+cache/0/16/0/descent = 0.0
+cache/0/16/0/underline_position = 0.0
+cache/0/16/0/underline_thickness = 0.0
+cache/0/16/0/scale = 1.0
+cache/0/64/0/ascent = 0.0
+cache/0/64/0/descent = 0.0
+cache/0/64/0/underline_position = 0.0
+cache/0/64/0/underline_thickness = 0.0
+cache/0/64/0/scale = 1.0
+cache/0/128/0/ascent = 0.0
+cache/0/128/0/descent = 0.0
+cache/0/128/0/underline_position = 0.0
+cache/0/128/0/underline_thickness = 0.0
+cache/0/128/0/scale = 1.0
+
+[node name="AfterglowMap" type="Node3D" unique_id=690590424]
+
+[node name="AfterglowDeck" type="MeshInstance3D" parent="." unique_id=755623908]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.02, 0)
 material_override = SubResource("Mat_deck")
+mesh = SubResource("Box_deck")
 
-[node name="CockpitStatusArea" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.08, -19)
-mesh = SubResource("Box_cockpit")
+[node name="CockpitStatusArea" type="MeshInstance3D" parent="." unique_id=835852808]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, -19)
 material_override = SubResource("Mat_cockpit")
+mesh = SubResource("Box_cockpit")
 
-[node name="RestCommonArea" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.08, 0)
-mesh = SubResource("Box_rest")
+[node name="RestCommonArea" type="MeshInstance3D" parent="." unique_id=833038853]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.08, 0)
 material_override = SubResource("Mat_rest")
+mesh = SubResource("Box_rest")
 
-[node name="WarehouseArea" type="MeshInstance3D" parent="."]
-position = Vector3(-31, 0.08, 13)
-mesh = SubResource("Box_warehouse_floor")
+[node name="WarehouseArea" type="MeshInstance3D" parent="." unique_id=608564523]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.08, 13)
 material_override = SubResource("Mat_warehouse_floor")
+mesh = SubResource("Box_warehouse_floor")
 
-[node name="DepartureHatchArea" type="MeshInstance3D" parent="."]
-position = Vector3(32, 0.08, 13)
-mesh = SubResource("Box_departure")
+[node name="DepartureHatchArea" type="MeshInstance3D" parent="." unique_id=800394890]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.08, 13)
 material_override = SubResource("Mat_departure")
+mesh = SubResource("Box_departure")
 
-[node name="WarehouseCrates" type="MeshInstance3D" parent="."]
-position = Vector3(-31, 1, 13)
-mesh = SubResource("Box_crates")
+[node name="WarehouseCrates" type="MeshInstance3D" parent="." unique_id=2132397077]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 1, 13)
 material_override = SubResource("Mat_crates")
+mesh = SubResource("Box_crates")
 
-[node name="WarehouseCollision" type="StaticBody3D" parent="."]
-position = Vector3(-31, 1, 13)
+[node name="WarehouseCollision" type="StaticBody3D" parent="." unique_id=1719254297]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 1, 13)
 collision_layer = 4
 collision_mask = 0
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="WarehouseCollision"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WarehouseCollision" unique_id=1977870144]
 shape = SubResource("Shape_crates")
 
-[node name="DepartureDoor" type="MeshInstance3D" parent="."]
-position = Vector3(32, 1.3, 19)
-mesh = SubResource("Box_door")
+[node name="DepartureDoor" type="MeshInstance3D" parent="." unique_id=1036264904]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 1.3, 19)
 material_override = SubResource("Mat_door")
+mesh = SubResource("Box_door")
 
-[node name="WarehousePoint" type="Node3D" parent="."]
-position = Vector3(-31, 0.1, 7)
+[node name="WarehousePoint" type="Node3D" parent="." unique_id=1590777244]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.1, 7)
 
-[node name="Marker" type="MeshInstance3D" parent="WarehousePoint"]
-mesh = SubResource("Marker_disc")
+[node name="Marker" type="MeshInstance3D" parent="WarehousePoint" unique_id=2037804408]
 material_override = SubResource("Mat_warehouse_marker")
-
-[node name="DeparturePoint" type="Node3D" parent="."]
-position = Vector3(32, 0.1, 4.5)
-
-[node name="Marker" type="MeshInstance3D" parent="DeparturePoint"]
 mesh = SubResource("Marker_disc")
+
+[node name="DeparturePoint" type="Node3D" parent="." unique_id=1891145756]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.1, 4.5)
+
+[node name="Marker" type="MeshInstance3D" parent="DeparturePoint" unique_id=652499939]
 material_override = SubResource("Mat_departure_marker")
+mesh = SubResource("Marker_disc")
 
-[node name="ControlsHint" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 0, 0.08, -2)
-modulate = Color(0.84, 0.92, 0.88, 1)
+[node name="ControlsHint" type="Label3D" parent="." unique_id=1146755765]
+transform = Transform3D(1, 0, 0, 0, 0.65090686, 0.7591574, 0, -0.7591574, 0.65090686, 0, 0.6194386, -1.8629996)
 text = "WASD Move  E Interact  B Backpack  Q Signal Flare"
-font_size = 32
+font = SubResource("FontFile_plkho")
+font_size = 128
 
-[node name="WarehouseHint" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, -31, 0.08, 0.5)
+[node name="WarehouseHint" type="Label3D" parent="." unique_id=274553346]
+transform = Transform3D(1, 0, 0, 0, 0.2866252, 0.95804274, 0, -0.95804274, 0.2866252, -31, 0.17, 0.5)
 modulate = Color(1, 0.76, 0.35, 1)
 text = "E Open Storage"
-font_size = 32
+font_size = 128
 
-[node name="DepartureHint" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 32, 0.08, 0.5)
+[node name="DepartureHint" type="Label3D" parent="." unique_id=1180480163]
+transform = Transform3D(0.9992832, 0.03154268, 0.02093151, -0.03290057, 0.45014876, 0.8923476, 0.018724786, -0.89239633, 0.45086384, 32, 0.17, 0.5)
 modulate = Color(0.58, 0.86, 1, 1)
 text = "Hold E Depart"
-font_size = 32
+font_size = 128
 
-[node name="CockpitHint" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 0, 0.08, -24)
+[node name="CockpitHint" type="Label3D" parent="." unique_id=537751903]
+transform = Transform3D(1, 0, 0, 0, 0.16522005, 0.98625666, 0, -0.98625666, 0.16522005, -0.08063698, 0.5278644, -24)
+pixel_size = 0.02
 modulate = Color(0.93, 0.88, 0.68, 1)
 text = "AFTERGLOW EXPRESS"
-font_size = 32
+font_size = 128
