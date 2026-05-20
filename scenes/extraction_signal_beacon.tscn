@@ -1,0 +1,41 @@
+[gd_scene format=3 uid="uid://extractionsignalbeacon01"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pending_landing"]
+top_radius = 2.4
+bottom_radius = 2.4
+height = 0.08
+radial_segments = 48
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pending_landing"]
+albedo_color = Color(0.08, 0.35, 0.32, 0.8)
+roughness = 0.65
+transparency = 1
+emission_enabled = true
+emission = Color(0, 0.7, 0.62, 1)
+emission_energy_multiplier = 0.25
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pending_beam"]
+top_radius = 0.18
+bottom_radius = 0.18
+height = 2.8
+radial_segments = 48
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pending_beam"]
+albedo_color = Color(0.1, 0.85, 0.78, 0.3)
+roughness = 0.65
+transparency = 1
+emission_enabled = true
+emission = Color(0, 1, 0.85, 1)
+emission_energy_multiplier = 1.0
+
+[node name="ExtractionSignalBeacon" type="Node3D"]
+
+[node name="PendingLandingPad" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.04, 0)
+mesh = SubResource("CylinderMesh_pending_landing")
+material_override = SubResource("StandardMaterial3D_pending_landing")
+
+[node name="PendingSignalBeam" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+mesh = SubResource("CylinderMesh_pending_beam")
+material_override = SubResource("StandardMaterial3D_pending_beam")
