@@ -7,6 +7,9 @@ extends Node3D
 @export var boarding_range: float = 3.75
 @export var arrival_offset: Vector3 = Vector3(0.0, 0.0, -3.0)
 
+const MOTHERSHIP_MARKER_SCENE := preload("res://scenes/mothership_extraction_marker.tscn")
+const SIGNAL_BEACON_SCENE := preload("res://scenes/extraction_signal_beacon.tscn")
+
 var _timer: float = 0.0
 var _waiting: bool = false
 var _arrived: bool = false
@@ -126,34 +129,17 @@ func _spawn_marker() -> void:
 	if _marker != null and is_instance_valid(_marker):
 		return
 
-	_marker = Node3D.new()
-	_marker.name = "MothershipExtractionMarker"
+	_marker = MOTHERSHIP_MARKER_SCENE.instantiate() as Node3D
 	add_child(_marker)
 	_marker.global_position = _landing_position
-
-	_add_cylinder(_marker, "LandingPad", Vector3(0.0, 0.06, 0.0), 3.5, 0.12, _make_material(Color(0.1, 0.55, 0.5, 1.0), Color(0.0, 0.9, 0.8, 1.0), 0.35))
-	_add_cylinder(_marker, "SignalBeam", Vector3(0.0, 2.1, 0.0), 0.32, 4.2, _make_material(Color(0.1, 0.85, 0.78, 0.45), Color(0.0, 1.0, 0.85, 1.0), 1.6))
-	_add_box(_marker, "MothershipHull", Vector3(0.0, 4.8, 0.0), Vector3(5.8, 0.75, 2.4), _make_material(Color(0.54, 0.58, 0.62, 1.0), Color(0.2, 0.9, 0.85, 1.0), 0.25))
-	_add_box(_marker, "BoardingRamp", Vector3(0.0, 1.05, 1.85), Vector3(2.0, 0.2, 2.8), _make_material(Color(0.24, 0.32, 0.34, 1.0), Color(0.0, 0.75, 0.7, 1.0), 0.2))
-
-	var light := OmniLight3D.new()
-	light.name = "ExtractionLight"
-	light.position = Vector3(0.0, 2.5, 0.0)
-	light.light_color = Color(0.0, 1.0, 0.85, 1.0)
-	light.light_energy = 4.0
-	light.omni_range = 9.0
-	_marker.add_child(light)
 
 
 func _spawn_waiting_beacon() -> void:
 	if _marker != null and is_instance_valid(_marker):
 		return
-	_marker = Node3D.new()
-	_marker.name = "ExtractionSignalBeacon"
+	_marker = SIGNAL_BEACON_SCENE.instantiate() as Node3D
 	add_child(_marker)
 	_marker.global_position = _landing_position
-	_add_cylinder(_marker, "PendingLandingPad", Vector3(0.0, 0.04, 0.0), 2.4, 0.08, _make_material(Color(0.08, 0.35, 0.32, 0.8), Color(0.0, 0.7, 0.62, 1.0), 0.25))
-	_add_cylinder(_marker, "PendingSignalBeam", Vector3(0.0, 1.4, 0.0), 0.18, 2.8, _make_material(Color(0.1, 0.85, 0.78, 0.30), Color(0.0, 1.0, 0.85, 1.0), 1.0))
 
 
 func _notify_spawn_manager() -> void:
@@ -179,38 +165,3 @@ func _clear_marker() -> void:
 	_marker = null
 
 
-func _add_box(parent: Node3D, node_name: String, position: Vector3, size: Vector3, material: Material) -> void:
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh_instance.name = node_name
-	mesh_instance.mesh = mesh
-	mesh_instance.position = position
-	mesh_instance.material_override = material
-	parent.add_child(mesh_instance)
-
-
-func _add_cylinder(parent: Node3D, node_name: String, position: Vector3, radius: float, height: float, material: Material) -> void:
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 48
-	mesh_instance.name = node_name
-	mesh_instance.mesh = mesh
-	mesh_instance.position = position
-	mesh_instance.material_override = material
-	parent.add_child(mesh_instance)
-
-
-func _make_material(albedo: Color, emission: Color, emission_energy: float) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = albedo
-	material.emission_enabled = emission_energy > 0.0
-	material.emission = emission
-	material.emission_energy_multiplier = emission_energy
-	material.roughness = 0.65
-	if albedo.a < 1.0:
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	return material

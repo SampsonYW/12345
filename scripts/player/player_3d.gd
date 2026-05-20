@@ -122,37 +122,16 @@ func _fire_signal_flare() -> void:
 		_spawn_signal_flare_marker()
 
 
+const FLARE_MARKER_SCENE := preload("res://scenes/signal_flare_marker.tscn")
+
+
 func _spawn_signal_flare_marker() -> void:
-	var marker := Node3D.new()
-	marker.name = "SignalFlareMarker"
+	var marker := FLARE_MARKER_SCENE.instantiate() as Node3D
 	marker.global_position = global_position
-
-	var beam := MeshInstance3D.new()
-	beam.name = "SignalBeam"
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 0.16
-	mesh.bottom_radius = 0.16
-	mesh.height = 7.5
-	beam.mesh = mesh
-	beam.position = Vector3(0.0, 3.75, 0.0)
-
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(1.0, 0.28, 0.12, 0.72)
-	material.emission_enabled = true
-	material.emission = Color(1.0, 0.22, 0.08, 1.0)
-	beam.material_override = material
-	marker.add_child(beam)
-
-	var light := OmniLight3D.new()
-	light.name = "SignalLight"
-	light.position = Vector3(0.0, 2.0, 0.0)
-	light.light_color = Color(1.0, 0.32, 0.12, 1.0)
-	light.light_energy = 3.0
-	light.omni_range = 8.0
-	marker.add_child(light)
 
 	var parent := get_tree().current_scene
 	if parent == null:
 		parent = get_parent()
 	parent.add_child(marker)
 	get_tree().create_timer(4.0).timeout.connect(Callable(marker, "queue_free"))
+
