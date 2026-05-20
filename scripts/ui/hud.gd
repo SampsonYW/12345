@@ -35,6 +35,9 @@ var _result_title_label: Label = null
 var _result_stats_label: Label = null
 var _prompt_label: Label = null
 var _risk_label: Label = null
+var _zone_name_label: Label = null
+var _zone_risk_label: Label = null
+var _zone_container: VBoxContainer = null
 var _backpack_overlay: Control = null
 var _storage_overlay: Control = null
 var _search_overlay: Control = null
@@ -163,6 +166,31 @@ func _build_status_labels() -> void:
 	top_right.add_child(_time_label)
 	top_right.add_child(_signal_label)
 	top_right.add_child(_risk_label)
+
+	# Zone info panel (top-left, below existing stats)
+	var zone_spacer := Control.new()
+	zone_spacer.custom_minimum_size = Vector2(0, 10)
+	zone_spacer.name = "ZoneSpacer"
+	top_left.add_child(zone_spacer)
+
+	_zone_container = VBoxContainer.new()
+	_zone_container.name = "ZoneInfo"
+	_zone_container.visible = false
+	top_left.add_child(_zone_container)
+
+	_zone_name_label = Label.new()
+	_zone_name_label.name = "ZoneNameLabel"
+	_zone_name_label.layout_mode = 2
+	_zone_name_label.text = ""
+	_zone_name_label.add_theme_font_size_override("font_size", 18)
+	_zone_container.add_child(_zone_name_label)
+
+	_zone_risk_label = Label.new()
+	_zone_risk_label.name = "ZoneRiskLabel"
+	_zone_risk_label.layout_mode = 2
+	_zone_risk_label.text = ""
+	_zone_risk_label.add_theme_font_size_override("font_size", 15)
+	_zone_container.add_child(_zone_risk_label)
 
 
 func _build_prompt_labels() -> void:
@@ -373,6 +401,20 @@ func get_risk_label_text() -> String:
 	return _risk_label.text if _risk_label != null else ""
 
 
+func set_zone_info(zone_name: String, risk: String) -> void:
+	if _zone_container != null:
+		_zone_container.visible = zone_name != ""
+	if _zone_name_label != null:
+		_zone_name_label.text = zone_name
+	if _zone_risk_label != null:
+		var risk_display := "低风险" if risk == "low" else "高风险"
+		_zone_risk_label.text = "危险等级: %s" % risk_display
+		if risk == "high":
+			_zone_risk_label.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3, 1.0))
+		else:
+			_zone_risk_label.add_theme_color_override("font_color", Color(0.45, 0.9, 0.55, 1.0))
+
+
 func open_backpack() -> void:
 	close_blocking_overlay()
 	if _backpack_overlay == null or not is_instance_valid(_backpack_overlay):
@@ -455,6 +497,7 @@ func _build_backpack_overlay() -> Control:
 	var grid := _make_backpack_grid()
 	content.add_child(grid)
 	var direct_grid := _make_backpack_grid()
+	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_position_overlay_child(direct_grid, Vector2(-180.0, -130.0), Vector2(180.0, 90.0))
 	overlay.add_child(direct_grid)
 	content.add_child(_make_hint_label("Esc or B closes. Quick-use keys still work after closing."))
@@ -475,6 +518,7 @@ func _build_storage_overlay() -> Control:
 	left.add_child(_make_overlay_title("Backpack"))
 	left.add_child(_make_backpack_grid())
 	var direct_grid := _make_backpack_grid()
+	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_position_overlay_child(direct_grid, Vector2(-390.0, -160.0), Vector2(-20.0, 120.0))
 	overlay.add_child(direct_grid)
 
@@ -489,6 +533,7 @@ func _build_storage_overlay() -> Control:
 	right.add_child(list)
 	var direct_list := VBoxContainer.new()
 	direct_list.name = "WarehouseList"
+	direct_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	direct_list.add_theme_constant_override("separation", 6)
 	_position_overlay_child(direct_list, Vector2(40.0, -160.0), Vector2(390.0, 120.0))
 	overlay.add_child(direct_list)
@@ -510,6 +555,7 @@ func _build_search_overlay() -> Control:
 	left.add_child(_make_overlay_title("Backpack"))
 	left.add_child(_make_backpack_grid())
 	var direct_grid := _make_backpack_grid()
+	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_position_overlay_child(direct_grid, Vector2(-430.0, -170.0), Vector2(-50.0, 130.0))
 	overlay.add_child(direct_grid)
 
@@ -524,6 +570,7 @@ func _build_search_overlay() -> Control:
 	right.add_child(list)
 	var direct_list := VBoxContainer.new()
 	direct_list.name = "ContainerList"
+	direct_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	direct_list.add_theme_constant_override("separation", 6)
 	_position_overlay_child(direct_list, Vector2(20.0, -170.0), Vector2(430.0, 130.0))
 	overlay.add_child(direct_list)
@@ -997,10 +1044,16 @@ func _on_signal_flare_fired(_origin: Vector3) -> void:
 func _on_location_changed(location: int) -> void:
 	if location == GameManager.Location.TITLE:
 		set_risk_label_text("Risk  Title")
+		if _zone_container != null:
+			_zone_container.visible = false
 	elif location == GameManager.Location.AFTERGLOW:
 		set_risk_label_text("Afterglow Express")
+		if _zone_container != null:
+			_zone_container.visible = false
 	elif location == GameManager.Location.EXPEDITION:
 		set_risk_label_text("Risk  Low Risk")
+		if _zone_container != null:
+			_zone_container.visible = true
 
 
 func _update_time_label() -> void:

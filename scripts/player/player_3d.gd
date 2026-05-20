@@ -30,6 +30,7 @@ func _physics_process(delta: float) -> void:
 	var speed: float = base_speed * (sprint_multiplier if _is_sprinting else 1.0)
 	velocity = move_dir * speed
 	move_and_slide()
+	_clamp_to_bounds()
 
 	GameManager.player_position = global_position
 	_update_aim_direction(move_dir)
@@ -138,3 +139,17 @@ func _spawn_signal_flare_marker() -> void:
 	parent.add_child(marker)
 	get_tree().create_timer(4.0).timeout.connect(Callable(marker, "queue_free"))
 
+
+func _clamp_to_bounds() -> void:
+	var pos := global_position
+	if GameManager.current_location == GameManager.Location.AFTERGLOW:
+		# Afterglow deck: 92 x 52, centered at origin
+		pos.x = clampf(pos.x, -46.0, 46.0)
+		pos.z = clampf(pos.z, -26.0, 26.0)
+	elif GameManager.current_location == GameManager.Location.EXPEDITION:
+		var scene_3d := get_tree().current_scene
+		if scene_3d != null and scene_3d.has_method("get_expedition_bounds"):
+			var bounds: Rect2 = scene_3d.get_expedition_bounds()
+			pos.x = clampf(pos.x, bounds.position.x, bounds.position.x + bounds.size.x)
+			pos.z = clampf(pos.z, bounds.position.y, bounds.position.y + bounds.size.y)
+	global_position = pos

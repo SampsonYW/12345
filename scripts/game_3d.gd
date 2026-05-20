@@ -78,6 +78,7 @@ var _afterglow_map: Node3D = null
 var _expedition_map: Node3D = null
 var _departure_hold: float = 0.0
 var _active_afterglow_point: String = ""
+var _container_hint_shown: bool = false
 
 @onready var _camera: Camera3D = $CameraRig/Camera3D
 @onready var _ground: StaticBody3D = $World/Ground
@@ -184,15 +185,21 @@ func get_zone_density_summary() -> Dictionary:
 	}
 
 
-func get_player_risk_label() -> String:
-	var risk := "Low Risk"
+func get_player_zone_info() -> Dictionary:
+	var info := {"name": "", "risk": "low"}
 	if _player == null:
-		return risk
+		return info
 	var pos := Vector2(_player.global_position.x, _player.global_position.z)
 	for zone in RISK_ZONE_DATA:
 		if _zone_contains(zone, pos):
-			risk = "High Risk" if zone.get("risk", "") == "high" else "Low Risk"
-	return risk
+			info["name"] = zone.get("name", "")
+			info["risk"] = zone.get("risk", "low")
+	return info
+
+
+func get_player_risk_label() -> String:
+	var info := get_player_zone_info()
+	return "High Risk" if info["risk"] == "high" else "Low Risk"
 
 
 func _ensure_map_roots() -> void:
@@ -334,13 +341,6 @@ func _add_zone_visuals() -> void:
 			Vector3(size.x, 0.03, size.y),
 			color
 		)
-		_add_label3d(
-			_expedition_map,
-			"%sLabel" % String(zone.get("name", "Risk")),
-			"%s  %s" % [String(zone.get("name", "Zone")), String(zone.get("risk", "risk")).to_upper()],
-			Vector3(center.x, 0.08, center.y),
-			Color(0.92, 0.88, 0.72, 1.0)
-		)
 
 
 func _spawn_enemies() -> void:
@@ -464,7 +464,11 @@ func _begin_expedition_from_afterglow() -> void:
 
 
 func _update_risk_label() -> void:
-	_set_risk_label_text("Risk  %s" % get_player_risk_label())
+	var info := get_player_zone_info()
+	if _hud != null and _hud.has_method("set_zone_info"):
+		_hud.set_zone_info(info["name"], info["risk"])
+	else:
+		_set_risk_label_text("Risk  %s" % get_player_risk_label())
 
 
 func _update_expedition_interactions() -> void:
@@ -475,11 +479,19 @@ func _update_expedition_interactions() -> void:
 		_set_prompt_text("")
 		return
 	if container.has_method("is_opened") and container.is_opened():
-		_set_prompt_text("E Search", (container as Node3D).global_position + Vector3(0.0, 0.0, 1.8))
+		if not _container_hint_shown:
+			_set_prompt_text("E Search", (container as Node3D).global_position + Vector3(0.0, 0.0, 1.8))
+		else:
+			_set_prompt_text("")
 		if Input.is_action_just_pressed("interact") and _hud != null and _hud.has_method("open_container_search"):
+			_container_hint_shown = true
+			_set_prompt_text("")
 			_hud.open_container_search(container)
 	else:
-		_set_prompt_text("Hold E Open", (container as Node3D).global_position + Vector3(0.0, 0.0, 1.8))
+		if not _container_hint_shown:
+			_set_prompt_text("Hold E Open", (container as Node3D).global_position + Vector3(0.0, 0.0, 1.8))
+		else:
+			_set_prompt_text("")
 
 
 func _find_nearby_container() -> Node:

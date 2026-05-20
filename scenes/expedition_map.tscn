@@ -201,44 +201,24 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -132, 0.015, 0)
 mesh = SubResource("BoxMesh_zone_outskirts")
 material_override = SubResource("StandardMaterial3D_low_zone")
 
-[node name="AshOutskirtsLabel" type="Label3D" parent="Zones"]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, -132, 0.08, 0)
-modulate = Color(0.92, 0.88, 0.72, 1)
-text = "Ash Outskirts  LOW"
-font_size = 32
 
 [node name="BrokenRailZone" type="MeshInstance3D" parent="Zones"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.015, -22)
 mesh = SubResource("BoxMesh_zone_rail")
 material_override = SubResource("StandardMaterial3D_low_zone")
 
-[node name="BrokenRailLabel" type="Label3D" parent="Zones"]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 8, 0.08, -22)
-modulate = Color(0.92, 0.88, 0.72, 1)
-text = "Broken Rail  LOW"
-font_size = 32
 
 [node name="BlackYardZone" type="MeshInstance3D" parent="Zones"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 132, 0.015, 8)
 mesh = SubResource("BoxMesh_zone_yard")
 material_override = SubResource("StandardMaterial3D_high_zone")
 
-[node name="BlackYardLabel" type="Label3D" parent="Zones"]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 132, 0.08, 8)
-modulate = Color(0.92, 0.88, 0.72, 1)
-text = "Black Yard  HIGH"
-font_size = 32
 
 [node name="CoreWreckZone" type="MeshInstance3D" parent="Zones"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.015, 66)
 mesh = SubResource("BoxMesh_zone_wreck")
 material_override = SubResource("StandardMaterial3D_high_zone")
 
-[node name="CoreWreckLabel" type="Label3D" parent="Zones"]
-transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 32, 0.08, 66)
-modulate = Color(0.92, 0.88, 0.72, 1)
-text = "Core Wreck  HIGH"
-font_size = 32
 
 [node name="Containers" type="Node3D" parent="."]
 
