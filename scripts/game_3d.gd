@@ -9,6 +9,7 @@ const CONTAINER_SCENE := preload("res://scenes/container_3d.tscn")
 const AFTERGLOW_MAP_SCENE := preload("res://scenes/afterglow_map.tscn")
 const EXTRACTION_SCRIPT := preload("res://scripts/systems/extraction.gd")
 const FOG_OF_WAR_SCRIPT := preload("res://scripts/systems/fog_of_war.gd")
+const FOG_OF_WAR_SCENE := preload("res://scenes/fog_of_war.tscn")
 const SPAWN_MANAGER_SCRIPT := preload("res://scripts/managers/spawn_manager.gd")
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
 
@@ -506,9 +507,7 @@ func _add_fog_of_war() -> void:
 	if existing != null:
 		_fog_of_war = existing
 		return
-	var fog := Node3D.new()
-	fog.name = "FogOfWar"
-	fog.set_script(FOG_OF_WAR_SCRIPT)
+	var fog := FOG_OF_WAR_SCENE.instantiate() as Node3D
 	add_child(fog)
 	_fog_of_war = fog
 

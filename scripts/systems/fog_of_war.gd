@@ -3,6 +3,8 @@
 # [AI-ASSISTED] 2026-05-20 - Day 4 P0 fog/vision pass.
 extends Node3D
 
+const EXPLORED_MARKER_SCENE = preload("res://scenes/explored_marker.tscn")
+
 @export var base_radius: float = 8.0
 @export var min_radius: float = 3.0
 @export var trail_interval: float = 0.35
@@ -52,15 +54,19 @@ func clear_trail() -> void:
 
 
 func _build_nodes() -> void:
-	_trail_parent = Node3D.new()
-	_trail_parent.name = "ExploredTrail"
-	add_child(_trail_parent)
+	_trail_parent = get_node_or_null("ExploredTrail") as Node3D
+	if _trail_parent == null:
+		_trail_parent = Node3D.new()
+		_trail_parent.name = "ExploredTrail"
+		add_child(_trail_parent)
 
-	_vision_disc = MeshInstance3D.new()
-	_vision_disc.name = "VisionDisc"
-	_vision_disc.mesh = _make_disc_mesh()
-	_vision_disc.material_override = _make_material(Color(0.5, 0.95, 0.75, 0.20), Color(0.1, 0.8, 0.45, 1.0), 0.18)
-	add_child(_vision_disc)
+	_vision_disc = get_node_or_null("VisionDisc") as MeshInstance3D
+	if _vision_disc == null:
+		_vision_disc = MeshInstance3D.new()
+		_vision_disc.name = "VisionDisc"
+		_vision_disc.mesh = _make_disc_mesh()
+		_vision_disc.material_override = _make_material(Color(0.5, 0.95, 0.75, 0.20), Color(0.1, 0.8, 0.45, 1.0), 0.18)
+		add_child(_vision_disc)
 
 
 func _bind_player() -> void:
@@ -71,10 +77,7 @@ func _bind_player() -> void:
 func _add_trail_marker(world_position: Vector3) -> void:
 	if _trail_parent == null:
 		return
-	var marker := MeshInstance3D.new()
-	marker.name = "ExploredMarker"
-	marker.mesh = _make_disc_mesh()
-	marker.material_override = _make_material(Color(0.42, 0.58, 0.46, 0.11), Color(0.0, 0.0, 0.0, 1.0), 0.0)
+	var marker := EXPLORED_MARKER_SCENE.instantiate() as MeshInstance3D
 	var radius := maxf(_current_radius * trail_radius_scale, min_radius)
 	marker.scale = Vector3(radius, 1.0, radius)
 	_trail_parent.add_child(marker)
