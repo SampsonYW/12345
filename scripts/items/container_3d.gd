@@ -26,6 +26,8 @@ var _search_entries: Array[Dictionary] = []
 func _ready() -> void:
 	_interact_area.body_entered.connect(_on_body_entered)
 	_interact_area.body_exited.connect(_on_body_exited)
+	if _visual.material_override != null:
+		_visual.material_override = _visual.material_override.duplicate()
 	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
 
 
@@ -215,10 +217,13 @@ func _find_pickup_parent() -> Node:
 
 
 func _set_visual_color(color: Color) -> void:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.84
-	_visual.material_override = material
+	if _visual.material_override is StandardMaterial3D:
+		_visual.material_override.albedo_color = color
+	else:
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color
+		material.roughness = 0.84
+		_visual.material_override = material
 
 
 func _on_body_entered(body: Node) -> void:

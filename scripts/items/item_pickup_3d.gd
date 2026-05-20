@@ -12,6 +12,8 @@ const ItemDataResource := preload("res://scripts/items/item_data.gd")
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
+	if _visual.material_override != null:
+		_visual.material_override = _visual.material_override.duplicate()
 	_update_visual()
 
 
@@ -34,11 +36,16 @@ func _update_visual() -> void:
 			color = Color(0.35, 0.85, 0.45, 1.0)
 		ItemDataResource.Type.PURIFIER:
 			color = Color(0.35, 0.85, 0.85, 1.0)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.emission_enabled = true
-	material.emission = color * 0.2
-	_visual.material_override = material
+	if _visual.material_override is StandardMaterial3D:
+		_visual.material_override.albedo_color = color
+		_visual.material_override.emission_enabled = true
+		_visual.material_override.emission = color * 0.2
+	else:
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color
+		material.emission_enabled = true
+		material.emission = color * 0.2
+		_visual.material_override = material
 
 
 func _on_body_entered(body: Node) -> void:
