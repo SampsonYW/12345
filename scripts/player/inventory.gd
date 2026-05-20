@@ -1,18 +1,16 @@
 # inventory.gd
-# 玩家背包：8 槽位 + 负重双约束。地上 ItemPickup 触发 add_item；按 1-8 触发 use_slot
-# 硬门槛：侵蚀 100% 禁止任何拾取；负重超上限禁止；槽满禁止
-# COLLECTIBLE 类型只能携带至撤离结算，不可主动使用
-# 挂在 Player 下的 Inventory Node 上
+# Player inventory: eight slots, weight limits, pickups, item use, and scoring.
 extends Node
 
 const SLOT_COUNT: int = 8
+const ItemDataResource := preload("res://scripts/items/item_data.gd")
 
 signal inventory_changed(slots: Array, current_weight: float, max_weight: float)
 signal pickup_blocked(reason: String)
 signal collectible_changed(count: int, score: int)
 signal use_blocked(reason: String)
 
-var slots: Array[ItemData] = []
+var slots: Array[ItemDataResource] = []
 
 
 func _ready() -> void:
@@ -22,45 +20,66 @@ func _ready() -> void:
 	_emit_all()
 
 
-# 尝试把 item 放进空槽。成功返回 true
-func add_item(item: ItemData) -> bool:
+func add_item(item: ItemDataResource) -> bool:
 	if item == null:
 		return false
 	if GameManager.player_erosion >= GameManager.max_erosion:
-		pickup_blocked.emit("侵蚀已满，无法拾取")
+		pickup_blocked.emit("Erosion maxed. Cannot pick up more.")
 		return false
 	var empty_idx: int = _find_empty_slot()
 	if empty_idx < 0:
-		pickup_blocked.emit("背包已满")
+		pickup_blocked.emit("Inventory full")
 		return false
 	if get_current_weight() + item.weight > GameManager.max_weight:
-		pickup_blocked.emit("超过负重上限")
+		pickup_blocked.emit("Weight limit exceeded")
 		return false
 	slots[empty_idx] = item
 	_emit_all()
 	return true
 
 
-# 主动使用 idx 槽位的物品。成功返回 true
+func transfer_revealed_item_from_container(container: Node, index: int) -> bool:
+	if container == null or not container.has_method("transfer_revealed_item_to_inventory"):
+		return false
+	return container.transfer_revealed_item_to_inventory(index, self)
+
+
+func get_slot_item(idx: int) -> ItemDataResource:
+	if idx < 0 or idx >= SLOT_COUNT:
+		return null
+	return slots[idx]
+
+
+func remove_slot_item(idx: int) -> ItemDataResource:
+	if idx < 0 or idx >= SLOT_COUNT:
+		return null
+	var item: ItemDataResource = slots[idx]
+	if item == null:
+		return null
+	slots[idx] = null
+	_emit_all()
+	return item
+
+
 func use_slot(idx: int) -> bool:
 	if idx < 0 or idx >= SLOT_COUNT:
 		return false
-	var item: ItemData = slots[idx]
+	var item: ItemDataResource = slots[idx]
 	if item == null:
 		return false
 	match item.type:
-		ItemData.Type.COLLECTIBLE:
-			use_blocked.emit("残响碎片仅在撤离时计分")
+		ItemDataResource.Type.COLLECTIBLE:
+			use_blocked.emit("Relics are scored only after extraction.")
 			return false
-		ItemData.Type.AMMO:
+		ItemDataResource.Type.AMMO:
 			var ps: Node = get_parent().get_node_or_null("PlayerShooting")
 			if ps and ps.has_method("add_ammo"):
 				ps.add_ammo(item.ammo_amount)
-		ItemData.Type.BATTERY:
+		ItemDataResource.Type.BATTERY:
 			var ph: Node = get_parent().get_node_or_null("PlayerHealth")
 			if ph and ph.has_method("heal"):
 				ph.heal(item.heal_amount)
-		ItemData.Type.PURIFIER:
+		ItemDataResource.Type.PURIFIER:
 			GameManager.reduce_erosion(item.purify_amount)
 	slots[idx] = null
 	_emit_all()
@@ -68,27 +87,27 @@ func use_slot(idx: int) -> bool:
 
 
 func get_current_weight() -> float:
-	var w: float = 0.0
+	var weight: float = 0.0
 	for item in slots:
 		if item != null:
-			w += item.weight
-	return w
+			weight += item.weight
+	return weight
 
 
 func get_collectible_count() -> int:
-	var n: int = 0
+	var count: int = 0
 	for item in slots:
-		if item != null and item.type == ItemData.Type.COLLECTIBLE:
-			n += 1
-	return n
+		if item != null and item.type == ItemDataResource.Type.COLLECTIBLE:
+			count += 1
+	return count
 
 
 func calculate_score() -> int:
-	var s: int = 0
+	var score: int = 0
 	for item in slots:
-		if item != null and item.type == ItemData.Type.COLLECTIBLE:
-			s += item.score_value
-	return s
+		if item != null and item.type == ItemDataResource.Type.COLLECTIBLE:
+			score += item.score_value
+	return score
 
 
 func clear_on_death() -> void:

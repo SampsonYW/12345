@@ -33,12 +33,16 @@ func _process(delta: float) -> void:
 		and GameManager.current_state != GameManager.State.EXTRACTING
 	):
 		return
+	if GameManager.ui_blocking_input:
+		return
 	if Input.is_action_pressed("shoot") and _fire_cooldown <= 0.0 and current_ammo > 0:
 		fire()
 
 
 func fire() -> void:
 	if current_ammo <= 0:
+		return
+	if GameManager.ui_blocking_input:
 		return
 	if bullet_scene == null:
 		push_warning("PlayerShooting3D.bullet_scene 未设置")

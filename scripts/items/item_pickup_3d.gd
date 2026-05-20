@@ -1,9 +1,11 @@
 # item_pickup_3d.gd
-# 3D 地面拾取物：玩家碰到后尝试加入 Inventory，失败时保留在地面。
-# [AI-ASSISTED] 2026-05-19 - 全 3D 重写拾取物
+# 3D ground pickup that hands items to the player's Inventory.
+# [AI-ASSISTED] 2026-05-19 - 3D pickup logic.
 extends Area3D
 
-@export var item_data: ItemData
+const ItemDataResource := preload("res://scripts/items/item_data.gd")
+
+@export var item_data: ItemDataResource
 
 @onready var _visual: MeshInstance3D = $Visual
 
@@ -13,7 +15,7 @@ func _ready() -> void:
 	_update_visual()
 
 
-func set_item(item: ItemData) -> void:
+func set_item(item: ItemDataResource) -> void:
 	item_data = item
 	if is_node_ready():
 		_update_visual()
@@ -24,13 +26,13 @@ func _update_visual() -> void:
 		return
 	var color := Color(0.9, 0.9, 0.9, 1.0)
 	match item_data.type:
-		ItemData.Type.COLLECTIBLE:
+		ItemDataResource.Type.COLLECTIBLE:
 			color = Color(0.95, 0.65, 0.25, 1.0)
-		ItemData.Type.AMMO:
+		ItemDataResource.Type.AMMO:
 			color = Color(0.4, 0.6, 0.95, 1.0)
-		ItemData.Type.BATTERY:
+		ItemDataResource.Type.BATTERY:
 			color = Color(0.35, 0.85, 0.45, 1.0)
-		ItemData.Type.PURIFIER:
+		ItemDataResource.Type.PURIFIER:
 			color = Color(0.35, 0.85, 0.85, 1.0)
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color

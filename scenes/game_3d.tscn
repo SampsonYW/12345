@@ -37,6 +37,15 @@ shadow_enabled = true
 
 [node name="World" type="Node3D" parent="."]
 
+[node name="WorldPrompt" type="Label3D" parent="World"]
+visible = false
+transform = Transform3D(1, 0, 0, 0, 0.422618, -0.906308, 0, 0.906308, 0.422618, 0, 0.08, 0)
+modulate = Color(0.96, 0.92, 0.68, 1)
+text = ""
+font_size = 38
+outline_size = 4
+outline_modulate = Color(0.03, 0.04, 0.035, 0.85)
+
 [node name="Ground" type="StaticBody3D" parent="World"]
 position = Vector3(0, -0.05, 0)
 collision_layer = 4

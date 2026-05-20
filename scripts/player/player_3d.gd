@@ -19,10 +19,7 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	if (
-		GameManager.current_state != GameManager.State.RUNNING
-		and GameManager.current_state != GameManager.State.EXTRACTING
-	):
+	if is_input_locked() or not _can_move_in_current_location():
 		velocity = Vector3.ZERO
 		return
 
@@ -40,6 +37,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_input_locked():
+		return
 	if event.is_action_pressed("signal_flare"):
 		_fire_signal_flare()
 		return
@@ -65,6 +64,10 @@ func get_sprint_cooldown_ratio() -> float:
 	if sprint_cooldown <= 0.0:
 		return 0.0
 	return clampf(_cooldown_timer / sprint_cooldown, 0.0, 1.0)
+
+
+func is_input_locked() -> bool:
+	return GameManager.ui_blocking_input
 
 
 func _update_aim_direction(move_dir: Vector3) -> void:
@@ -104,6 +107,52 @@ func _use_inventory_slot(idx: int) -> void:
 		inv.use_slot(idx)
 
 
+func _can_move_in_current_location() -> bool:
+	if GameManager.current_location == GameManager.Location.AFTERGLOW:
+		return true
+	return (
+		GameManager.current_state == GameManager.State.RUNNING
+		or GameManager.current_state == GameManager.State.EXTRACTING
+	)
+
+
 func _fire_signal_flare() -> void:
 	if GameManager.fire_signal_flare(global_position):
 		NoiseManager.emit_noise(global_position, NoiseManager.Level.GLOBAL)
+		_spawn_signal_flare_marker()
+
+
+func _spawn_signal_flare_marker() -> void:
+	var marker := Node3D.new()
+	marker.name = "SignalFlareMarker"
+	marker.global_position = global_position
+
+	var beam := MeshInstance3D.new()
+	beam.name = "SignalBeam"
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.16
+	mesh.bottom_radius = 0.16
+	mesh.height = 7.5
+	beam.mesh = mesh
+	beam.position = Vector3(0.0, 3.75, 0.0)
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(1.0, 0.28, 0.12, 0.72)
+	material.emission_enabled = true
+	material.emission = Color(1.0, 0.22, 0.08, 1.0)
+	beam.material_override = material
+	marker.add_child(beam)
+
+	var light := OmniLight3D.new()
+	light.name = "SignalLight"
+	light.position = Vector3(0.0, 2.0, 0.0)
+	light.light_color = Color(1.0, 0.32, 0.12, 1.0)
+	light.light_energy = 3.0
+	light.omni_range = 8.0
+	marker.add_child(light)
+
+	var parent := get_tree().current_scene
+	if parent == null:
+		parent = get_parent()
+	parent.add_child(marker)
+	get_tree().create_timer(4.0).timeout.connect(Callable(marker, "queue_free"))

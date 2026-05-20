@@ -1,6 +1,9 @@
+# extraction.gd
+# Signal flare extraction flow: wait, arrival marker, boarding, and success.
+# [AI-ASSISTED] 2026-05-20 - Day 4 P0 extraction loop.
 extends Node3D
 
-@export var wait_time: float = 10.0
+@export var wait_time: float = 75.0
 @export var boarding_range: float = 3.75
 @export var arrival_offset: Vector3 = Vector3(0.0, 0.0, -3.0)
 
@@ -27,10 +30,62 @@ func _process(delta: float) -> void:
 		if _timer <= 0.0:
 			_waiting = false
 			_arrived = true
+			_clear_marker()
 			_spawn_marker()
 
-	if _arrived and Input.is_action_just_pressed("interact") and _player_in_boarding_range():
-		GameManager.set_state(GameManager.State.SUCCESS)
+	if _arrived and not GameManager.ui_blocking_input and Input.is_action_just_pressed("interact"):
+		try_board()
+
+
+func get_remaining_time() -> float:
+	return maxf(_timer, 0.0) if _waiting else 0.0
+
+
+func has_arrived() -> bool:
+	return _arrived
+
+
+func get_landing_position() -> Vector3:
+	return _landing_position
+
+
+func try_board() -> bool:
+	if GameManager.ui_blocking_input:
+		return false
+	if not _arrived:
+		return false
+	if not _player_in_boarding_range():
+		return false
+	GameManager.set_state(GameManager.State.SUCCESS)
+	return true
+
+
+func get_status_text() -> String:
+	if _arrived:
+		return "Board [E]"
+	if _waiting:
+		return "Arrives %ds" % int(ceil(get_remaining_time()))
+	return "Ready" if not GameManager.signal_flare_used else "Fired"
+
+
+func get_extraction_direction(from_position: Vector3 = Vector3.ZERO) -> Vector3:
+	var origin := from_position
+	if origin == Vector3.ZERO:
+		origin = GameManager.player_position
+	var direction := _landing_position - origin
+	direction.y = 0.0
+	return direction.normalized() if direction.length_squared() > 0.01 else Vector3.ZERO
+
+
+func get_pressure_status() -> Dictionary:
+	return {
+		"status_text": get_status_text(),
+		"remaining_time": get_remaining_time(),
+		"landing_position": _landing_position,
+		"direction": get_extraction_direction(),
+		"waiting": _waiting,
+		"arrived": _arrived,
+	}
 
 
 func _on_signal_flare_fired(origin: Vector3) -> void:
@@ -46,6 +101,9 @@ func _on_signal_flare_fired(origin: Vector3) -> void:
 	_waiting = true
 	_arrived = false
 	_clear_marker()
+	_notify_spawn_manager()
+	_notify_enemies_of_signal(origin)
+	_spawn_waiting_beacon()
 
 
 func _on_state_changed(new_state: int) -> void:
@@ -53,8 +111,7 @@ func _on_state_changed(new_state: int) -> void:
 		return
 	_waiting = false
 	_arrived = false
-	if new_state == GameManager.State.PREPARING or new_state == GameManager.State.RUNNING:
-		_clear_marker()
+	_clear_marker()
 
 
 func _player_in_boarding_range() -> bool:
@@ -71,8 +128,8 @@ func _spawn_marker() -> void:
 
 	_marker = Node3D.new()
 	_marker.name = "MothershipExtractionMarker"
-	_marker.global_position = _landing_position
 	add_child(_marker)
+	_marker.global_position = _landing_position
 
 	_add_cylinder(_marker, "LandingPad", Vector3(0.0, 0.06, 0.0), 3.5, 0.12, _make_material(Color(0.1, 0.55, 0.5, 1.0), Color(0.0, 0.9, 0.8, 1.0), 0.35))
 	_add_cylinder(_marker, "SignalBeam", Vector3(0.0, 2.1, 0.0), 0.32, 4.2, _make_material(Color(0.1, 0.85, 0.78, 0.45), Color(0.0, 1.0, 0.85, 1.0), 1.6))
@@ -88,9 +145,37 @@ func _spawn_marker() -> void:
 	_marker.add_child(light)
 
 
+func _spawn_waiting_beacon() -> void:
+	if _marker != null and is_instance_valid(_marker):
+		return
+	_marker = Node3D.new()
+	_marker.name = "ExtractionSignalBeacon"
+	add_child(_marker)
+	_marker.global_position = _landing_position
+	_add_cylinder(_marker, "PendingLandingPad", Vector3(0.0, 0.04, 0.0), 2.4, 0.08, _make_material(Color(0.08, 0.35, 0.32, 0.8), Color(0.0, 0.7, 0.62, 1.0), 0.25))
+	_add_cylinder(_marker, "PendingSignalBeam", Vector3(0.0, 1.4, 0.0), 0.18, 2.8, _make_material(Color(0.1, 0.85, 0.78, 0.30), Color(0.0, 1.0, 0.85, 1.0), 1.0))
+
+
+func _notify_spawn_manager() -> void:
+	var spawn_manager := get_parent().get_node_or_null("SpawnManager")
+	if spawn_manager != null and spawn_manager.has_method("on_signal_flare"):
+		spawn_manager.on_signal_flare()
+
+
+func _notify_enemies_of_signal(origin: Vector3) -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	for enemy in tree.get_nodes_in_group("enemies"):
+		if enemy != null and enemy.has_method("react_to_signal_flare"):
+			enemy.react_to_signal_flare(origin, _landing_position)
+
+
 func _clear_marker() -> void:
 	if _marker != null and is_instance_valid(_marker):
-		_marker.queue_free()
+		if _marker.get_parent() != null:
+			_marker.get_parent().remove_child(_marker)
+		_marker.free()
 	_marker = null
 
 
