@@ -3,7 +3,7 @@
 # [AI-ASSISTED] 2026-05-20 - Day 4 P0 fog/vision pass.
 extends Node3D
 
-const EXPLORED_MARKER_SCENE = preload("res://scenes/explored_marker.tscn")
+const EXPLORED_MARKER_SCENE := preload("res://scenes/explored_marker.tscn")
 
 @export var base_radius: float = 8.0
 @export var min_radius: float = 3.0
