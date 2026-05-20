@@ -347,6 +347,8 @@ func _ensure_alert_bar() -> void:
 		add_child(_alert_bar)
 	if _alert_bar != null:
 		_ensure_alert_bar_meshes()
+		if _alert_bar_fill != null and _alert_bar_fill.material_override != null:
+			_alert_bar_fill.material_override = _alert_bar_fill.material_override.duplicate()
 
 
 func _update_alert_bar() -> void:
@@ -371,6 +373,8 @@ func _ensure_hp_bar() -> void:
 		add_child(_hp_bar)
 	if _hp_bar != null:
 		_ensure_hp_bar_meshes()
+		if _hp_bar_fill != null and _hp_bar_fill.material_override != null:
+			_hp_bar_fill.material_override = _hp_bar_fill.material_override.duplicate()
 
 
 func _update_hp_bar() -> void:
