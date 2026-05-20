@@ -72,6 +72,17 @@ func seed_initial_enemies() -> void:
 	if _initial_spawned:
 		return
 	_initial_spawned = true
+
+	var map = get_node_or_null("../World/ExpeditionMap")
+	var initial_spawns = map.get_node_or_null("InitialSpawns") if map != null else null
+	if initial_spawns != null:
+		for spawn in initial_spawns.get_children():
+			if spawn is Node3D:
+				var is_dormant = spawn.name.to_lower().contains("dormant")
+				var scene = _dormant_scene if is_dormant else _patrol_scene
+				_spawn_fixed(scene, spawn.global_position)
+		return
+
 	_spawn_fixed(_patrol_scene, Vector3(-58.0, 0.0, -28.0))
 	_spawn_fixed(_patrol_scene, Vector3(-18.0, 0.0, 44.0))
 	_spawn_fixed(_dormant_scene, Vector3(34.0, 0.0, -46.0))

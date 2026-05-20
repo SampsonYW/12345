@@ -6,6 +6,7 @@ const PLAYER_SCENE := preload("res://scenes/player_3d.tscn")
 const PATROL_ENEMY_SCENE := preload("res://scenes/patrol_enemy_3d.tscn")
 const DORMANT_ENEMY_SCENE := preload("res://scenes/dormant_enemy_3d.tscn")
 const CONTAINER_SCENE := preload("res://scenes/container_3d.tscn")
+const EXPEDITION_MAP_SCENE := preload("res://scenes/expedition_map.tscn")
 const AFTERGLOW_MAP_SCENE := preload("res://scenes/afterglow_map.tscn")
 const EXTRACTION_SCRIPT := preload("res://scripts/systems/extraction.gd")
 const FOG_OF_WAR_SCENE := preload("res://scenes/fog_of_war.tscn")
@@ -202,9 +203,20 @@ func _ensure_map_roots() -> void:
 		$World.add_child(_afterglow_map)
 	_expedition_map = $World.get_node_or_null("ExpeditionMap") as Node3D
 	if _expedition_map == null:
-		_expedition_map = Node3D.new()
+		_expedition_map = EXPEDITION_MAP_SCENE.instantiate() as Node3D
 		_expedition_map.name = "ExpeditionMap"
 		$World.add_child(_expedition_map)
+
+		# Wire preplaced containers inside the scene to the global _containers group
+		var map_containers = _expedition_map.get_node_or_null("Containers")
+		if map_containers != null and _containers != null:
+			for child in map_containers.get_children():
+				map_containers.remove_child(child)
+				_containers.add_child(child)
+				if child.has_signal("cracked") and not child.cracked.is_connected(_on_container_cracked):
+					child.cracked.connect(_on_container_cracked)
+				if "risk" in child:
+					child.set_meta("risk", child.risk)
 
 
 func _spawn_player() -> void:
@@ -236,6 +248,8 @@ func _build_afterglow_map() -> void:
 
 
 func _build_expedition_map() -> void:
+	if _expedition_map.scene_file_path != "":
+		return
 	_resize_ground_for_expedition()
 	_clear_children(_expedition_map)
 	_spawn_obstacles()
@@ -348,8 +362,8 @@ func _apply_location(location: int) -> void:
 	var afterglow_active := location == GameManager.Location.AFTERGLOW
 	_afterglow_map.visible = afterglow_active
 	_expedition_map.visible = expedition_active
-	_ground.visible = expedition_active
-	_obstacles.visible = expedition_active
+	_ground.visible = expedition_active and _expedition_map.scene_file_path == ""
+	_obstacles.visible = expedition_active and _expedition_map.scene_file_path == ""
 	_containers.visible = expedition_active
 	_enemies.visible = expedition_active
 	_pickups.visible = expedition_active

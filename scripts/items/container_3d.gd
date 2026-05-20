@@ -9,6 +9,7 @@ const ITEM_PICKUP_SCENE := preload("res://scenes/item_pickup_3d.tscn")
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
 
 @export var loot_table: Array[ItemDataResource] = []
+@export var risk: String = "low"
 @export var base_crack_time: float = 2.0
 @export var base_search_time: float = 1.0
 @export var pickup_spread_radius: float = 1.5
