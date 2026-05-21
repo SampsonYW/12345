@@ -1,144 +1,73 @@
 # fog_of_war.gd
-# Lightweight 3D MVP vision disc with explored ground trail.
-# [AI-ASSISTED] 2026-05-20 - Day 4 P0 fog/vision pass.
+# View distance system: erosion reduces how far the player can see.
+# Areas beyond view distance are covered by a semi-transparent fog mask.
+# Erosion 0% = 100% view distance, Erosion 100% = 50% view distance.
 extends Node3D
 
-const EXPLORED_MARKER_SCENE := preload("res://scenes/explored_marker.tscn")
-
+## Base view distance at 0% erosion (100% view distance).
 @export var base_radius: float = 8.0
-@export var min_radius: float = 3.0
-@export var trail_interval: float = 0.35
-@export var trail_radius_scale: float = 0.72
-@export var max_trail_markers: int = 28
+## Minimum view distance ratio at 100% erosion. 0.5 = 50% of base_radius.
+@export var min_radius_ratio: float = 0.5
+## Height of the fog mask plane above ground.
 @export var fog_height: float = 0.15
 
 var _current_radius: float = 8.0
-var _trail_timer: float = 0.0
 var _player: Node3D = null
-var _vision_disc: MeshInstance3D = null
-var _trail_parent: Node3D = null
 var _fog_mask: MeshInstance3D = null
 
 
 func _ready() -> void:
 	_current_radius = base_radius
-	_build_nodes()
+	_build_fog_mask()
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	_bind_player()
 	if _player == null:
 		return
 	var erosion_ratio := clampf(GameManager.player_erosion / maxf(GameManager.max_erosion, 1.0), 0.0, 1.0)
-	_current_radius = lerpf(base_radius, min_radius, erosion_ratio)
-	_vision_disc.global_position = _ground_position(_player.global_position, 0.035)
-	_vision_disc.scale = Vector3(_current_radius, 1.0, _current_radius)
-	
+	# Erosion 0% → base_radius (100%), Erosion 100% → base_radius * min_radius_ratio (50%)
+	_current_radius = lerpf(base_radius, base_radius * min_radius_ratio, erosion_ratio)
+
 	if _fog_mask != null:
 		_fog_mask.global_position = Vector3(_player.global_position.x, fog_height, _player.global_position.z)
 		var mat := _fog_mask.material_override as ShaderMaterial
 		if mat != null:
 			mat.set_shader_parameter("player_position", _player.global_position)
 			mat.set_shader_parameter("vision_radius", _current_radius)
-			
-	_trail_timer -= delta
-	if _trail_timer <= 0.0:
-		_trail_timer = trail_interval
-		_add_trail_marker(_player.global_position)
 
 
+## Returns the current view distance radius.
 func get_current_radius() -> float:
 	return _current_radius
 
 
-func get_explored_marker_count() -> int:
-	return _trail_parent.get_child_count() if _trail_parent != null else 0
-
-
-func clear_trail() -> void:
-	if _trail_parent == null:
+func _build_fog_mask() -> void:
+	if DisplayServer.get_name() == "headless":
 		return
-	for child in _trail_parent.get_children():
-		_trail_parent.remove_child(child)
-		child.free()
 
+	_fog_mask = get_node_or_null("FogMask") as MeshInstance3D
+	if _fog_mask == null:
+		_fog_mask = MeshInstance3D.new()
+		_fog_mask.name = "FogMask"
+		var mesh := PlaneMesh.new()
+		mesh.size = Vector2(1000.0, 1000.0)
+		_fog_mask.mesh = mesh
+		_fog_mask.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-func _build_nodes() -> void:
-	_trail_parent = get_node_or_null("ExploredTrail") as Node3D
-	if _trail_parent == null:
-		_trail_parent = Node3D.new()
-		_trail_parent.name = "ExploredTrail"
-		add_child(_trail_parent)
-
-	_vision_disc = get_node_or_null("VisionDisc") as MeshInstance3D
-	if _vision_disc == null:
-		_vision_disc = MeshInstance3D.new()
-		_vision_disc.name = "VisionDisc"
-		_vision_disc.mesh = _make_disc_mesh()
-		_vision_disc.material_override = _make_material(Color(0.5, 0.95, 0.75, 0.20), Color(0.1, 0.8, 0.45, 1.0), 0.18)
-		add_child(_vision_disc)
-
-	if DisplayServer.get_name() != "headless":
-		_fog_mask = get_node_or_null("FogMask") as MeshInstance3D
-		if _fog_mask == null:
-			_fog_mask = MeshInstance3D.new()
-			_fog_mask.name = "FogMask"
-			var mesh := PlaneMesh.new()
-			mesh.size = Vector2(1000.0, 1000.0)
-			_fog_mask.mesh = mesh
-			_fog_mask.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			
-			# Load shader
-			var shader = load("res://shaders/fog_mask.gdshader") as Shader
-			if shader != null:
-				var mat := ShaderMaterial.new()
-				mat.shader = shader
-				mat.set_shader_parameter("player_position", Vector3.ZERO)
-				mat.set_shader_parameter("vision_radius", 8.0)
-				mat.set_shader_parameter("fog_opacity", 0.65)
-				mat.set_shader_parameter("fog_color", Color(0.05, 0.06, 0.08, 1.0))
-				_fog_mask.material_override = mat
-			add_child(_fog_mask)
+		# Load shader for distance-based fog
+		var shader = load("res://shaders/fog_mask.gdshader") as Shader
+		if shader != null:
+			var mat := ShaderMaterial.new()
+			mat.shader = shader
+			mat.set_shader_parameter("player_position", Vector3.ZERO)
+			mat.set_shader_parameter("vision_radius", base_radius)
+			mat.set_shader_parameter("fog_opacity", 0.65)
+			mat.set_shader_parameter("fog_color", Color(0.05, 0.06, 0.08, 1.0))
+			_fog_mask.material_override = mat
+		add_child(_fog_mask)
 
 
 func _bind_player() -> void:
 	if _player == null or not is_instance_valid(_player):
 		_player = get_tree().get_first_node_in_group("player") as Node3D
-
-
-func _add_trail_marker(world_position: Vector3) -> void:
-	if _trail_parent == null:
-		return
-	var marker := EXPLORED_MARKER_SCENE.instantiate() as MeshInstance3D
-	var radius := maxf(_current_radius * trail_radius_scale, min_radius)
-	marker.scale = Vector3(radius, 1.0, radius)
-	_trail_parent.add_child(marker)
-	marker.global_position = _ground_position(world_position, 0.025)
-	while _trail_parent.get_child_count() > max_trail_markers:
-		var oldest := _trail_parent.get_child(0)
-		_trail_parent.remove_child(oldest)
-		oldest.free()
-
-
-func _ground_position(value: Vector3, y: float) -> Vector3:
-	return Vector3(value.x, y, value.z)
-
-
-func _make_disc_mesh() -> CylinderMesh:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = 1.0
-	mesh.bottom_radius = 1.0
-	mesh.height = 0.025
-	mesh.radial_segments = 64
-	return mesh
-
-
-func _make_material(albedo: Color, emission: Color, emission_energy: float) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = albedo
-	material.roughness = 0.9
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.emission_enabled = emission_energy > 0.0
-	material.emission = emission
-	material.emission_energy_multiplier = emission_energy
-	return material

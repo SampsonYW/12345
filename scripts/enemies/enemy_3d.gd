@@ -81,6 +81,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			velocity = Vector3.ZERO
 		move_and_slide()
+		# Clamp to ground level to prevent riding up on obstacles
+		global_position.y = 0.0
 		return
 	match _state:
 		State.PATROL:
@@ -92,6 +94,8 @@ func _physics_process(delta: float) -> void:
 		State.ATTACK:
 			_update_attack(delta, player)
 	move_and_slide()
+	# Clamp to ground level to prevent riding up on obstacles
+	global_position.y = 0.0
 
 
 func get_enemy_kind() -> String:

@@ -60,8 +60,8 @@ func _run() -> void:
 		_expect(kinds.has("patrol"), "3D scene should spawn patrol enemies")
 		_expect(kinds.has("dormant"), "3D scene should spawn dormant enemies")
 
-	var containers := scene.get_node_or_null("Entities/Containers")
-	_expect(containers != null and containers.get_child_count() > 0, "3D scene should spawn containers")
+	var containers := scene.get_node_or_null("World/ExpeditionMap/Containers")
+	_expect(containers != null and containers.get_child_count() > 0, "Expedition map should contain containers")
 
 	scene.queue_free()
 	await process_frame

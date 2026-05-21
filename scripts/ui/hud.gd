@@ -45,6 +45,10 @@ var _active_blocking_overlay: Control = null
 var _search_container: Node = null
 var _search_active_index: int = -1
 var _search_feedback_label: Label = null
+var _search_entry_snapshot: Array = []
+var _hold_progress_container: Control = null
+var _hold_progress_fill: ColorRect = null
+var _hold_progress_label: Label = null
 var _warehouse_stock := {
 	"Standard Ammo": 12,
 	"Small Battery": 6,
@@ -211,6 +215,62 @@ func _build_prompt_labels() -> void:
 	_prompt_label.add_theme_font_size_override("font_size", 18)
 	_prompt_label.add_theme_color_override("font_color", Color(0.92, 0.98, 0.94, 1.0))
 	add_child(_prompt_label)
+	_build_hold_progress()
+
+
+func _build_hold_progress() -> void:
+	# Container: centered bottom, above PromptLabel
+	_hold_progress_container = Control.new()
+	_hold_progress_container.name = "HoldProgress"
+	_hold_progress_container.layout_mode = 1
+	_hold_progress_container.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_hold_progress_container.anchor_left = 0.5
+	_hold_progress_container.anchor_top = 1.0
+	_hold_progress_container.anchor_right = 0.5
+	_hold_progress_container.anchor_bottom = 1.0
+	_hold_progress_container.offset_left = -140.0
+	_hold_progress_container.offset_top = -100.0
+	_hold_progress_container.offset_right = 140.0
+	_hold_progress_container.offset_bottom = -68.0
+	_hold_progress_container.visible = false
+	_hold_progress_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hold_progress_container)
+
+	# Background bar
+	var bg := ColorRect.new()
+	bg.name = "BG"
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0.08, 0.08, 0.08, 0.75)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hold_progress_container.add_child(bg)
+
+	# Fill bar
+	_hold_progress_fill = ColorRect.new()
+	_hold_progress_fill.name = "Fill"
+	_hold_progress_fill.layout_mode = 1
+	_hold_progress_fill.anchor_left = 0.0
+	_hold_progress_fill.anchor_top = 0.0
+	_hold_progress_fill.anchor_right = 0.0
+	_hold_progress_fill.anchor_bottom = 1.0
+	_hold_progress_fill.offset_left = 2.0
+	_hold_progress_fill.offset_top = 2.0
+	_hold_progress_fill.offset_right = 2.0
+	_hold_progress_fill.offset_bottom = -2.0
+	_hold_progress_fill.color = Color(0.38, 0.78, 1.0, 0.9)
+	_hold_progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hold_progress_container.add_child(_hold_progress_fill)
+
+	# Label overlay
+	_hold_progress_label = Label.new()
+	_hold_progress_label.name = "Label"
+	_hold_progress_label.layout_mode = 1
+	_hold_progress_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hold_progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hold_progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_hold_progress_label.add_theme_font_size_override("font_size", 16)
+	_hold_progress_label.add_theme_color_override("font_color", Color(0.96, 0.96, 0.96, 1.0))
+	_hold_progress_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hold_progress_container.add_child(_hold_progress_label)
 
 
 func _build_slot_panels() -> void:
@@ -392,6 +452,25 @@ func get_prompt_text() -> String:
 	return _prompt_label.text if _prompt_label != null else ""
 
 
+func show_hold_progress(ratio: float, text: String = "") -> void:
+	if _hold_progress_container == null:
+		return
+	_hold_progress_container.visible = true
+	if _hold_progress_label != null:
+		_hold_progress_label.text = text if text != "" else "%d%%" % int(round(ratio * 100.0))
+	if _hold_progress_fill != null:
+		var container_width := _hold_progress_container.size.x - 4.0
+		_hold_progress_fill.offset_right = 2.0 + container_width * clampf(ratio, 0.0, 1.0)
+		# Color gradient: blue → cyan → green
+		var c := Color(0.38, 0.78, 1.0, 0.9).lerp(Color(0.35, 0.92, 0.45, 0.9), ratio)
+		_hold_progress_fill.color = c
+
+
+func hide_hold_progress() -> void:
+	if _hold_progress_container != null:
+		_hold_progress_container.visible = false
+
+
 func set_risk_label_text(text: String) -> void:
 	if _risk_label != null:
 		_risk_label.text = text
@@ -456,6 +535,7 @@ func close_blocking_overlay() -> void:
 	_active_blocking_overlay = null
 	_search_container = null
 	_search_active_index = -1
+	_search_entry_snapshot.clear()
 	GameManager.set_ui_blocking_input(false)
 
 
@@ -693,11 +773,13 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 		var row := HBoxContainer.new()
 		row.custom_minimum_size = Vector2(0.0, 34.0)
 		row.add_theme_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		row_panel.add_child(row)
 		var label := Label.new()
 		label.text = "%s x %d" % [String(item_name), int(_warehouse_stock.get(item_name, 0))]
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.add_theme_color_override("font_color", Color(0.90, 0.94, 0.88, 1.0))
+		label.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(label)
 		var button := Button.new()
 		button.text = "Move"
@@ -735,10 +817,12 @@ func _populate_container_list() -> void:
 		var row := HBoxContainer.new()
 		row.custom_minimum_size = Vector2(0.0, 38.0)
 		row.add_theme_constant_override("separation", 8)
+		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		row_panel.add_child(row)
 		var label := Label.new()
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.add_theme_color_override("font_color", Color(0.90, 0.94, 0.88, 1.0))
+		label.mouse_filter = Control.MOUSE_FILTER_PASS
 		label.text = "%d  %s" % [i + 1, _get_container_entry_label(i)]
 		row.add_child(label)
 		var button := Button.new()
@@ -748,6 +832,7 @@ func _populate_container_list() -> void:
 		button.pressed.connect(Callable(self, "_transfer_container_entry").bind(i))
 		row.add_child(button)
 		list.add_child(row_panel)
+	_save_search_snapshot()
 
 
 func _get_container_entry_label(index: int) -> String:
@@ -895,7 +980,13 @@ func _process_container_search(delta: float) -> void:
 		_search_active_index = _find_next_unsearched_entry(count)
 	if _search_active_index >= 0:
 		_search_container.search_entry(_search_active_index, delta)
-	_populate_container_list()
+	# Only rebuild the list when structural state changes (entry revealed/transferred).
+	# This prevents destroying buttons/drag-slots every frame, which was blocking
+	# mouse clicks and drag-and-drop interactions.
+	if _search_state_changed(count):
+		_populate_container_list()
+	else:
+		_update_container_search_labels()
 
 
 func _handle_overlay_shortcut(event: InputEventKey) -> bool:
@@ -931,6 +1022,58 @@ func _find_next_unsearched_entry(count: int) -> int:
 			continue
 		return i
 	return -1
+
+
+func _search_state_changed(count: int) -> bool:
+	if _search_container == null:
+		return false
+	if _search_entry_snapshot.size() != count:
+		return true
+	for i in count:
+		var revealed := false
+		var transferred := false
+		if _search_container.has_method("is_entry_revealed"):
+			revealed = _search_container.is_entry_revealed(i)
+		if _search_container.has_method("is_entry_transferred"):
+			transferred = _search_container.is_entry_transferred(i)
+		var snap: Dictionary = _search_entry_snapshot[i]
+		if snap.get("revealed", false) != revealed or snap.get("transferred", false) != transferred:
+			return true
+	return false
+
+
+func _save_search_snapshot() -> void:
+	_search_entry_snapshot.clear()
+	if _search_container == null or not is_instance_valid(_search_container):
+		return
+	var count := 0
+	if _search_container.has_method("get_search_entry_count"):
+		count = _search_container.get_search_entry_count()
+	for i in count:
+		var revealed := false
+		var transferred := false
+		if _search_container.has_method("is_entry_revealed"):
+			revealed = _search_container.is_entry_revealed(i)
+		if _search_container.has_method("is_entry_transferred"):
+			transferred = _search_container.is_entry_transferred(i)
+		_search_entry_snapshot.append({"revealed": revealed, "transferred": transferred})
+
+
+func _update_container_search_labels() -> void:
+	if _search_overlay == null:
+		return
+	var list := _search_overlay.get_node_or_null("ContainerList") as VBoxContainer
+	if list == null:
+		return
+	var children := list.get_children()
+	for i in children.size():
+		var row_panel: Control = children[i]
+		var row := row_panel.get_child(0) if row_panel.get_child_count() > 0 else null
+		if row == null:
+			continue
+		var label := row.get_child(0) if row.get_child_count() > 0 else null
+		if label is Label:
+			label.text = "%d  %s" % [i + 1, _get_container_entry_label(i)]
 
 
 func _show_main_overlay(show: bool) -> void:

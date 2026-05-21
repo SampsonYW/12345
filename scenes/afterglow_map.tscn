@@ -1,5 +1,7 @@
 [gd_scene format=3 uid="uid://du6oaysi500nc"]
 
+[ext_resource type="Script" uid="uid://1codd5pwpd7m" path="res://scripts/maps/afterglow_map.gd" id="script_afterglow"]
+
 [sub_resource type="StandardMaterial3D" id="Mat_deck"]
 albedo_color = Color(0.16, 0.2, 0.18, 1)
 roughness = 0.82
@@ -97,6 +99,7 @@ cache/0/128/0/underline_thickness = 0.0
 cache/0/128/0/scale = 1.0
 
 [node name="AfterglowMap" type="Node3D" unique_id=690590424]
+script = ExtResource("script_afterglow")
 
 [node name="AfterglowDeck" type="MeshInstance3D" parent="." unique_id=755623908]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.02, 0)
@@ -142,40 +145,58 @@ material_override = SubResource("Mat_door")
 mesh = SubResource("Box_door")
 
 [node name="WarehousePoint" type="Node3D" parent="." unique_id=1590777244]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.1, 7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.18, 7)
 
 [node name="Marker" type="MeshInstance3D" parent="WarehousePoint" unique_id=2037804408]
 material_override = SubResource("Mat_warehouse_marker")
 mesh = SubResource("Marker_disc")
 
 [node name="DeparturePoint" type="Node3D" parent="." unique_id=1891145756]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.1, 4.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.18, 13)
 
 [node name="Marker" type="MeshInstance3D" parent="DeparturePoint" unique_id=652499939]
 material_override = SubResource("Mat_departure_marker")
 mesh = SubResource("Marker_disc")
 
 [node name="ControlsHint" type="Label3D" parent="." unique_id=1146755765]
-transform = Transform3D(1, 0, 0, 0, 0.65090686, 0.7591574, 0, -0.7591574, 0.65090686, 0, 0.6194386, -1.8629996)
+transform = Transform3D(1, 0, 0, 0, 0.65090686, 0.7591574, 0, -0.7591574, 0.65090686, 0, 0.5, -1.5)
+no_depth_test = true
+render_priority = 10
+modulate = Color(0.88, 0.94, 0.9, 0.85)
+outline_modulate = Color(0.02, 0.03, 0.03, 0.7)
 text = "WASD Move  E Interact  B Backpack  Q Signal Flare"
 font = SubResource("FontFile_plkho")
-font_size = 128
+font_size = 96
+outline_size = 6
 
 [node name="WarehouseHint" type="Label3D" parent="." unique_id=274553346]
-transform = Transform3D(1, 0, 0, 0, 0.2866252, 0.95804274, 0, -0.95804274, 0.2866252, -31, 0.17, 0.5)
+transform = Transform3D(1, 0, 0, 0, 0.2866252, 0.95804274, 0, -0.95804274, 0.2866252, -31, 0.35, 0.5)
+no_depth_test = true
+render_priority = 10
 modulate = Color(1, 0.76, 0.35, 1)
-text = "E Open Storage"
-font_size = 128
+outline_modulate = Color(0.15, 0.08, 0.0, 0.6)
+text = "E  Storage"
+font_size = 96
+outline_size = 6
 
 [node name="DepartureHint" type="Label3D" parent="." unique_id=1180480163]
-transform = Transform3D(0.9992832, 0.03154268, 0.02093151, -0.03290057, 0.45014876, 0.8923476, 0.018724786, -0.89239633, 0.45086384, 32, 0.17, 0.5)
+transform = Transform3D(1, 0, 0, 0, 0.2866252, 0.95804274, 0, -0.95804274, 0.2866252, 32, 0.35, 7.0)
+no_depth_test = true
+render_priority = 10
 modulate = Color(0.58, 0.86, 1, 1)
-text = "Hold E Depart"
-font_size = 128
+outline_modulate = Color(0.0, 0.08, 0.15, 0.6)
+text = "Hold E  Depart"
+font_size = 96
+outline_size = 6
 
 [node name="CockpitHint" type="Label3D" parent="." unique_id=537751903]
-transform = Transform3D(1, 0, 0, 0, 0.16522005, 0.98625666, 0, -0.98625666, 0.16522005, -0.08063698, 0.5278644, -24)
+transform = Transform3D(1, 0, 0, 0, 0.16522005, 0.98625666, 0, -0.98625666, 0.16522005, 0, 0.5, -24)
+no_depth_test = true
+render_priority = 10
 pixel_size = 0.02
 modulate = Color(0.93, 0.88, 0.68, 1)
+outline_modulate = Color(0.1, 0.08, 0.04, 0.5)
 text = "AFTERGLOW EXPRESS"
 font_size = 128
+outline_size = 8
+

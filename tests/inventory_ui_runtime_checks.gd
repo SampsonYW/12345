@@ -51,7 +51,8 @@ func _run() -> void:
 	if player.has_method("is_input_locked"):
 		_expect(player.is_input_locked(), "Opening backpack locks player movement")
 	_expect(hud.get_node_or_null("BackpackOverlay") != null, "Backpack overlay exists")
-	var container := scene.get_node_or_null("Entities/Containers").get_child(0)
+	var container_parent := scene.get_node_or_null("World/ExpeditionMap/Containers")
+	var container := container_parent.get_child(0) if container_parent != null and container_parent.get_child_count() > 0 else null
 	if container != null:
 		var cracked_before: bool = container.is_opened() if container.has_method("is_opened") else false
 		if container.has_method("_complete_crack"):

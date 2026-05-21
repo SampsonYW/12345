@@ -1,5 +1,5 @@
 param(
-	[string]$GodotPath = "C:\Users\chengqi\Downloads\Godot_v4.6.2-stable_win64_console.exe",
+	[string]$GodotPath = "",
 	[int]$TimeoutSeconds = 90,
 	[int]$MaxWorkingSetMb = 4096
 )
@@ -7,23 +7,54 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$runtimeChecks = @(
-	"tests\mvp_runtime_checks.gd",
-	"tests\game_3d_runtime_checks.gd",
-	"tests\dev_a_runtime_checks.gd",
-	"tests\hud_input_runtime_checks.gd",
-	"tests\enemy_ai_runtime_checks.gd",
-	"tests\noise_manager_runtime_checks.gd",
-	"tests\polish_flow_runtime_checks.gd",
-	"tests\inventory_ui_runtime_checks.gd",
-	"tests\container_search_runtime_checks.gd",
-	"tests\expedition_map_runtime_checks.gd",
-	"tests\extraction_pressure_runtime_checks.gd"
-)
+$testsRoot = Join-Path $root "tests"
+$runtimeChecks = Get-ChildItem -LiteralPath $testsRoot -Filter "*_runtime_checks.gd" |
+	Sort-Object Name |
+	ForEach-Object { $_.FullName.Substring($root.Length + 1) }
 
-if (-not (Test-Path $GodotPath)) {
-	throw "Godot console executable not found: $GodotPath"
+if ($runtimeChecks.Count -eq 0) {
+	throw "No runtime check scripts found in $testsRoot"
 }
+
+function Resolve-GodotConsolePath {
+	param([string]$RequestedPath)
+
+	if (-not [string]::IsNullOrWhiteSpace($RequestedPath)) {
+		if (Test-Path $RequestedPath) {
+			return (Resolve-Path $RequestedPath).Path
+		}
+		throw "Godot console executable not found: $RequestedPath"
+	}
+
+	foreach ($searchRoot in @($root, $testsRoot)) {
+		$candidate = Get-ChildItem -LiteralPath $searchRoot -File -ErrorAction SilentlyContinue |
+			Where-Object { $_.Name -match "^(godot|godot4)([._-]?console)?\.exe$" -or $_.Name -match "^Godot_v.*(_console)?\.exe$" } |
+			Sort-Object @{ Expression = { if ($_.Name -match "console") { 0 } else { 1 } } }, Name |
+			Select-Object -First 1
+		if ($null -ne $candidate) {
+			return $candidate.FullName
+		}
+	}
+
+	$envCandidates = @($env:GODOT_BIN, $env:GODOT_PATH) |
+		Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+	foreach ($candidate in $envCandidates) {
+		if (Test-Path $candidate) {
+			return (Resolve-Path $candidate).Path
+		}
+	}
+
+	foreach ($commandName in @("godot", "godot4", "godot.console", "godot4_console")) {
+		$command = Get-Command $commandName -ErrorAction SilentlyContinue
+		if ($null -ne $command) {
+			return $command.Source
+		}
+	}
+
+	throw "Godot console executable not found. Put Godot in the project root/tests folder, pass -GodotPath, set GODOT_BIN/GODOT_PATH, or add Godot to PATH."
+}
+
+$resolvedGodotPath = Resolve-GodotConsolePath -RequestedPath $GodotPath
 
 function Invoke-GodotRuntimeCheck {
 	param([string]$ScriptPath)
@@ -32,7 +63,7 @@ function Invoke-GodotRuntimeCheck {
 	$stderr = Join-Path $env:TEMP ("godot-runtime-" + [Guid]::NewGuid().ToString("N") + ".err.log")
 	$args = @("--headless", "--path", $root, "--script", $ScriptPath)
 	$process = Start-Process `
-		-FilePath $GodotPath `
+		-FilePath $resolvedGodotPath `
 		-ArgumentList $args `
 		-WorkingDirectory $root `
 		-WindowStyle Hidden `

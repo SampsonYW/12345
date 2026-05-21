@@ -20,6 +20,9 @@ mono_crash.*.json
 .claude/
 .worktrees/
 
+# --- 二进制可执行文件 ---
+*.exe
+
 # --- 常见操作系统垃圾文件 ---
 .DS_Store
 Thumbs.db
@@ -47,3 +50,6 @@ godot_*.log
 *.xdv
 *.fls
 *.fdb_latexmk
+
+# Test scripts are run directly; Godot can regenerate these local UID sidecars.
+tests/*.gd.uid

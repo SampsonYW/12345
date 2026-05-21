@@ -78,21 +78,14 @@ func _run() -> void:
 		_expect(spawn_positions.size() >= 2, "SpawnManager should vary procedural spawn points")
 
 	if fog != null:
-		fog.max_trail_markers = 3
 		manager.player_erosion = 0.0
 		fog._process(0.0)
 		var full_radius: float = fog.get_current_radius()
 		manager.player_erosion = 100.0
 		fog._process(0.0)
 		var minimum_radius: float = fog.get_current_radius()
-		_expect(minimum_radius < full_radius, "Fog radius should shrink at high erosion")
-		var player := scene.get_node_or_null("Entities/Player3D") as Node3D
-		if player != null:
-			player.global_position = Vector3(5.0, 0.0, 0.0)
-			for i in 8:
-				fog._process(0.4)
-			_expect(fog.get_explored_marker_count() > 0, "Fog should leave explored trail markers")
-			_expect(fog.get_explored_marker_count() <= 3, "Fog trail should cap explored markers")
+		_expect(minimum_radius < full_radius, "View distance should shrink at high erosion")
+		_expect(minimum_radius >= full_radius * 0.45, "Minimum view distance should be around 50% of base")
 
 	manager.player_erosion = 0.0
 	manager.elapsed_time = 0.0

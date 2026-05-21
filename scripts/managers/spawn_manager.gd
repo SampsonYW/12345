@@ -1,6 +1,7 @@
 # spawn_manager.gd
 # Time and erosion driven enemy pressure for the 3D MVP run loop.
 # [AI-ASSISTED] 2026-05-20 - Day 4 P0 spawn pressure.
+# [AI-ASSISTED] 2026-05-21 - Fix enemies spawning on obstacles.
 extends Node3D
 
 const DEFAULT_SPAWN_POINTS := [
@@ -18,6 +19,8 @@ const DEFAULT_SPAWN_POINTS := [
 @export var signal_min_spawns_per_minute: float = 8.0
 @export var max_alive_enemies: int = 32
 @export var minimum_spawn_distance: float = 12.0
+@export var obstacle_collision_mask: int = 4
+@export var obstacle_clear_radius: float = 2.5
 
 var spawn_curve := [
 	[0.0, 0.0],
@@ -83,14 +86,25 @@ func seed_initial_enemies() -> void:
 				_spawn_fixed(scene, spawn.global_position)
 		return
 
-	_spawn_fixed(_patrol_scene, Vector3(-58.0, 0.0, -28.0))
-	_spawn_fixed(_patrol_scene, Vector3(-18.0, 0.0, 44.0))
-	_spawn_fixed(_dormant_scene, Vector3(34.0, 0.0, -46.0))
-	_spawn_fixed(_dormant_scene, Vector3(-92.0, 0.0, 62.0))
-	_spawn_fixed(_patrol_scene, Vector3(96.0, 0.0, -36.0))
-	_spawn_fixed(_patrol_scene, Vector3(132.0, 0.0, 42.0))
-	_spawn_fixed(_dormant_scene, Vector3(48.0, 0.0, 78.0))
-	_spawn_fixed(_dormant_scene, Vector3(154.0, 0.0, -68.0))
+	# Fallback: spawn enemies at hardcoded positions (used when .tscn has no InitialSpawns)
+	# --- Low risk: Ash Outskirts ---
+	_spawn_fixed(_patrol_scene, Vector3(-160.0, 0.0, -30.0))
+	_spawn_fixed(_dormant_scene, Vector3(-140.0, 0.0, 50.0))
+	# --- Low risk: Broken Rail ---
+	_spawn_fixed(_patrol_scene, Vector3(-20.0, 0.0, -40.0))
+	_spawn_fixed(_dormant_scene, Vector3(30.0, 0.0, -60.0))
+	# --- High risk: Black Yard ---
+	_spawn_fixed(_patrol_scene, Vector3(100.0, 0.0, -30.0))
+	_spawn_fixed(_patrol_scene, Vector3(170.0, 0.0, 10.0))
+	_spawn_fixed(_dormant_scene, Vector3(125.0, 0.0, -45.0))
+	_spawn_fixed(_dormant_scene, Vector3(155.0, 0.0, -15.0))
+	_spawn_fixed(_dormant_scene, Vector3(195.0, 0.0, 35.0))
+	_spawn_fixed(_dormant_scene, Vector3(145.0, 0.0, 55.0))
+	# --- High risk: Core Wreck ---
+	_spawn_fixed(_patrol_scene, Vector3(40.0, 0.0, 65.0))
+	_spawn_fixed(_patrol_scene, Vector3(25.0, 0.0, 85.0))
+	_spawn_fixed(_dormant_scene, Vector3(55.0, 0.0, 75.0))
+	_spawn_fixed(_dormant_scene, Vector3(10.0, 0.0, 90.0))
 
 
 func spawn_enemy(elapsed: float, tier: int) -> Node3D:
@@ -206,9 +220,10 @@ func _get_ranked_spawn_points() -> Array[Vector3]:
 func _spawn_fixed(scene: PackedScene, point: Vector3, tier: int = -1) -> Node3D:
 	if scene == null or _get_enemy_parent() == null:
 		return null
+	var clear_point := _find_clear_spawn_position(point)
 	var enemy := scene.instantiate() as Node3D
 	_get_enemy_parent().add_child(enemy)
-	enemy.global_position = point
+	enemy.global_position = clear_point
 	if enemy.has_method("set_erosion_tier"):
 		enemy.set_erosion_tier(GameManager.get_erosion_tier() if tier < 0 else tier)
 	return enemy
@@ -226,6 +241,58 @@ func _get_enemy_parent() -> Node:
 func _get_dormant_ratio(tier: int) -> float:
 	var safe_tier := clampi(tier, 0, GameManager.EROSION_DORMANT_RATIO.size() - 1)
 	return GameManager.EROSION_DORMANT_RATIO[safe_tier]
+
+
+## Check if a spawn point overlaps an obstacle and find a clear alternative.
+## Uses a downward raycast from above; if it hits an obstacle, tries offsets.
+func _find_clear_spawn_position(point: Vector3) -> Vector3:
+	var candidate := Vector3(point.x, 0.0, point.z)
+	if not _is_point_on_obstacle(candidate):
+		return candidate
+	# Try offset positions in a spiral pattern to escape the obstacle
+	var offsets: Array[Vector3] = [
+		Vector3(obstacle_clear_radius, 0.0, 0.0),
+		Vector3(-obstacle_clear_radius, 0.0, 0.0),
+		Vector3(0.0, 0.0, obstacle_clear_radius),
+		Vector3(0.0, 0.0, -obstacle_clear_radius),
+		Vector3(obstacle_clear_radius, 0.0, obstacle_clear_radius),
+		Vector3(-obstacle_clear_radius, 0.0, obstacle_clear_radius),
+		Vector3(obstacle_clear_radius, 0.0, -obstacle_clear_radius),
+		Vector3(-obstacle_clear_radius, 0.0, -obstacle_clear_radius),
+		Vector3(obstacle_clear_radius * 2.0, 0.0, 0.0),
+		Vector3(-obstacle_clear_radius * 2.0, 0.0, 0.0),
+		Vector3(0.0, 0.0, obstacle_clear_radius * 2.0),
+		Vector3(0.0, 0.0, -obstacle_clear_radius * 2.0),
+	]
+	for offset: Vector3 in offsets:
+		var test: Vector3 = candidate + offset
+		if not _is_point_on_obstacle(test):
+			return test
+	# All nearby positions blocked – fall back to original but force ground level
+	return candidate
+
+
+## Returns true if the given ground-level position overlaps with an obstacle.
+func _is_point_on_obstacle(point: Vector3) -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	var world := tree.root.get_world_3d()
+	if world == null:
+		return false
+	var space_state := world.direct_space_state
+	if space_state == null:
+		return false
+	# Cast a ray from above the point straight down
+	var ray_origin := Vector3(point.x, 10.0, point.z)
+	var ray_end := Vector3(point.x, -1.0, point.z)
+	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end, obstacle_collision_mask)
+	var result := space_state.intersect_ray(query)
+	if result.is_empty():
+		return false
+	# If the hit point is above ground level (y > 0.05), we're on an obstacle
+	var hit_pos: Vector3 = result["position"]
+	return hit_pos.y > 0.05
 
 
 func _on_game_state_changed(new_state: int) -> void:
