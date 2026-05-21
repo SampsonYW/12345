@@ -2,7 +2,7 @@
 
 > 本文档为 `design.md` 的技术实现补充，面向开发团队。
 > **最后更新**: 2026-05-19
-> **当前口径**: 主玩法入口已切换为 3D 正交斜俯视；已落地 3D 玩家/射击/HP/背包/容器/敌人/信号弹状态；时间刷怪、事件、撤离等待与战争迷雾按 Day 4 计划补齐。
+> **当前口径**: 主玩法入口已切换为 3D 正交斜俯视；已落地 3D 玩家/射击/HP/背包/容器/敌人/信号弹状态与可视视野（视野锥 + 近距圆，详见 §8）；时间刷怪、事件、撤离等待按 Day 4 计划补齐。
 
 ---
 
@@ -51,7 +51,7 @@ project/
 │   │   ├── item_pickup.gd
 │   │   └── item_data.gd
 │   ├── systems/
-│   │   ├── fog_of_war.gd      # Day 4 待实现
+│   │   ├── fog_of_war.gd      # 可视视野（视野锥 + 近距圆，详见 §8）
 │   │   └── extraction.gd       # Day 4 待实现
 │   └── ui/
 │       └── hud.gd
@@ -767,31 +767,56 @@ func execute_event(type: EventType) -> void:
 
 ---
 
-## 8. 战争迷雾
+## 8. 可视视野（Vision System）
 
-使用 **Light2D + CanvasModulate** 方案（Godot 原生支持）：
+实现：`scripts/systems/fog_of_war.gd`（文件名沿用历史，类型为 `Node3D`，挂在 `game_3d.tscn` 根下）。
+风格参考《Project Zomboid》（僵尸毁灭工程）的视野锥 + 近距感知：
 
 ```
-FogOfWar (CanvasLayer)
-├── CanvasModulate             # 全局变暗（未探索区域）
-└── (玩家身上)
-    └── PointLight2D           # 照亮玩家视野
+FogOfWar (Node3D)         # 视野系统根
+├── VisionDisc            # 近距 360° 感知圆（半透明地面盘）
+└── VisionCone            # 视野锥扇形（运行时按 cone_half_angle_deg 生成）
 ```
+
+**几何判定**：
+
+| 区域 | 是否可见 |
+|------|----------|
+| 近距感知圆内（默认 3.5m）| 不受锥角限制；过 obstacle 射线 → 可见 |
+| 视野锥扇形内（默认 ±60°、14m） | 锥角内 + 过 obstacle 射线 → 可见 |
+| 其余 | 不可见（`entity.visible = false`） |
+
+**目标 group**：默认 `enemies` + `pickups`。容器和障碍物等大型地物不参与判定（始终可见，玩家需记忆地图）。
+
+**侵蚀耦合**：满侵蚀时 `cone_range *= erosion_cone_shrink`（默认 0.5），`close_radius *= erosion_close_shrink`（默认 0.85）。
 
 ```gdscript
-# fog_of_war.gd — 挂在 Player 的 PointLight2D 上
-extends PointLight2D
-
-@export var base_radius := 400.0
-@export var min_radius := 150.0
-
-func _process(_delta: float) -> void:
-    var erosion := GameManager.player_erosion / 100.0
-    texture_scale = lerpf(base_radius, min_radius, erosion) / 512.0
-    # 512 = light 纹理基准大小
+# fog_of_war.gd 关键判定
+func _in_view(player: Node3D, target_pos: Vector3) -> bool:
+    var to := Vector3(target_pos.x - player.global_position.x, 0.0,
+                       target_pos.z - player.global_position.z)
+    var dist_sq := to.length_squared()
+    # 1. 近距 360°
+    if dist_sq <= close_radius * close_radius:
+        return _has_clear_line(player.global_position, target_pos)
+    # 2. 超出锥射程
+    if dist_sq > cone_range * cone_range:
+        return false
+    # 3. 角度判定（鼠标瞄向 ± cone_half_angle_deg）
+    var aim := player.get_aim_direction()
+    if rad_to_deg(aim.angle_to(to.normalized())) > cone_half_angle_deg:
+        return false
+    # 4. 障碍遮挡（layer 3 = Obstacles）
+    return _has_clear_line(player.global_position, target_pos)
 ```
 
-已探索区域留痕可通过 **SubViewport + 白色圆绘制到 RenderTexture** 实现，或使用 `Line2D` 轨迹简化。
+**性能**：实体可见性按 `update_interval`（默认 0.05s = 20Hz）刷新，单帧只遍历 `enemies` + `pickups` 两个 group。射线掩码限制到 obstacle layer，避免穿到敌人/容器。
+
+**对外 API**：
+- `get_current_cone_range() -> float` — 当前侵蚀下的锥射程
+- `get_current_close_radius() -> float` — 当前侵蚀下的近距圆半径
+- `is_position_visible(world_position: Vector3) -> bool` — 单点可见性查询
+- `reset_visibility()` / `clear_trail()`（兼容别名）— 离开 EXPEDITION 时复位所有被隐藏实体
 
 ---
 
@@ -998,8 +1023,10 @@ func register_kill() -> void:
 | 子弹伤害 | 20 | |
 | 弹药箱补给 | 25 发 | |
 | 基础破解时间 | 2 秒 | |
-| 视野基础半径 | 400 px | |
-| 视野最小半径 | 150 px | 侵蚀 100% 时 |
+| 视野锥基础射程 | 14 m | 鼠标瞄向方向 |
+| 视野锥总开角 | 120° | 2 × cone_half_angle_deg |
+| 近距感知圆半径 | 3.5 m | 360° 无视角度 |
+| 视野锥最小射程 | 7 m | 侵蚀 100% 时（×0.5）|
 | 无敌帧 | 0.5 秒 | |
 | 巡逻型 HP | 40 | 基础值，侵蚀倍率加成 |
 | 休眠型 HP | 80 | 基础值，侵蚀倍率加成 |

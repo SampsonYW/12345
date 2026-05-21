@@ -1,5 +1,5 @@
 # mvp_runtime_checks.gd
-# Runtime checks for the Day 4 P0 MVP loop: spawn pressure, fog, and extraction.
+# Runtime checks for the Day 4 P0 MVP loop: spawn pressure, vision, and extraction.
 extends SceneTree
 
 var _failures: Array[String] = []
@@ -35,10 +35,14 @@ func _run() -> void:
 		extraction.wait_time = 0.1
 
 	var fog := scene.get_node_or_null("FogOfWar")
-	_expect(fog != null, "Game3D should create FogOfWar")
+	_expect(fog != null, "Game3D should create FogOfWar (vision system)")
 	_expect(
-		fog != null and fog.has_method("get_current_radius"),
-		"FogOfWar should expose the current erosion-scaled radius"
+		fog != null and fog.has_method("get_current_cone_range"),
+		"FogOfWar should expose the current erosion-scaled cone range"
+	)
+	_expect(
+		fog != null and fog.has_method("is_position_visible"),
+		"FogOfWar should expose per-position visibility query"
 	)
 
 	manager.start_run()
@@ -80,12 +84,25 @@ func _run() -> void:
 	if fog != null:
 		manager.player_erosion = 0.0
 		fog._process(0.0)
-		var full_radius: float = fog.get_current_radius()
+		var full_range: float = fog.get_current_cone_range()
 		manager.player_erosion = 100.0
 		fog._process(0.0)
-		var minimum_radius: float = fog.get_current_radius()
-		_expect(minimum_radius < full_radius, "View distance should shrink at high erosion")
-		_expect(minimum_radius >= full_radius * 0.45, "Minimum view distance should be around 50% of base")
+		var minimum_range: float = fog.get_current_cone_range()
+		_expect(minimum_range < full_range, "Vision cone range should shrink at high erosion")
+		var player := scene.get_node_or_null("Entities/Player3D") as Node3D
+		if player != null:
+			player.global_position = Vector3.ZERO
+			manager.player_erosion = 0.0
+			fog._process(0.0)
+			# 近距感知圆覆盖原点附近，必可见
+			_expect(fog.is_position_visible(Vector3(0.5, 0.0, 0.5)), "Close peripheral awareness should see nearby points")
+			# 视野锥外（玩家背后远处）应不可见
+			var aim: Vector3 = player.call("get_aim_direction") if player.has_method("get_aim_direction") else -player.global_transform.basis.z
+			aim.y = 0.0
+			if aim.length_squared() < 0.0001:
+				aim = Vector3.FORWARD
+			var behind: Vector3 = player.global_position - aim.normalized() * (fog.get_current_close_radius() + 5.0)
+			_expect(not fog.is_position_visible(behind), "Points behind the player (outside close circle) should be hidden")
 
 	manager.player_erosion = 0.0
 	manager.elapsed_time = 0.0
