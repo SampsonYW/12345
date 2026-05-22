@@ -39,6 +39,12 @@ func take_damage(amount: float) -> void:
 		_die()
 
 
+func reset_health() -> void:
+	current_hp = max_hp
+	iframe_timer = 0.0
+	health_changed.emit(current_hp, max_hp)
+
+
 func heal(amount: float) -> void:
 	if current_hp <= 0.0:
 		return

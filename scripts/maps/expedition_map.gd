@@ -85,6 +85,18 @@ func deactivate() -> void:
 	_set_collision_active(false)
 
 
+## Reset all mutable map state (containers, hints) so a new expedition starts fresh.
+func reset() -> void:
+	_container_hint_shown = false
+	var containers := get_node_or_null("Containers")
+	if containers == null:
+		return
+	for child in containers.get_children():
+		if child.has_method("reset"):
+			child.reset()
+
+
+
 func update(delta: float) -> void:
 	if _player == null:
 		return

@@ -196,6 +196,9 @@ func _apply_location(location: int) -> void:
 	if _expedition_map != null and _expedition_map.has_method("deactivate"):
 		_expedition_map.deactivate()
 
+	# Reset player health when switching locations (fixes HP persisting across runs)
+	_reset_player_health()
+
 	# Activate target map
 	if afterglow_active and _afterglow_map != null and _afterglow_map.has_method("activate"):
 		_afterglow_map.activate(_player, _hud, _world_prompt)
@@ -203,8 +206,11 @@ func _apply_location(location: int) -> void:
 			_player.global_position = Vector3(0.0, 0.0, 5.0)
 			GameManager.player_position = _player.global_position
 		_set_risk_label_text("余晖号")
-	elif expedition_active and _expedition_map != null and _expedition_map.has_method("activate"):
-		_expedition_map.activate(_player, _hud, _world_prompt)
+	elif expedition_active:
+		# Reset expedition map state (containers, loot) without re-instantiating
+		_reset_expedition_map()
+		if _expedition_map != null and _expedition_map.has_method("activate"):
+			_expedition_map.activate(_player, _hud, _world_prompt)
 		if _player != null:
 			_player.global_position = Vector3.ZERO
 			GameManager.player_position = _player.global_position
@@ -212,6 +218,12 @@ func _apply_location(location: int) -> void:
 		# Title state
 		_clear_children(_enemies)
 		_set_risk_label_text("标题")
+
+	# Clear expedition-only entities on every transition so nothing leaks
+	if not expedition_active:
+		_clear_children(_enemies)
+		_clear_children(_pickups)
+		_clear_children(_projectiles)
 
 	# Expedition-only entities & systems
 	_enemies.visible = expedition_active
@@ -227,9 +239,6 @@ func _apply_location(location: int) -> void:
 			Node.PROCESS_MODE_INHERIT if expedition_active
 			else Node.PROCESS_MODE_DISABLED
 		)
-
-	if location == GameManager.Location.AFTERGLOW:
-		_clear_children(_enemies)
 
 	_set_prompt_text("")
 
@@ -278,3 +287,16 @@ func _clear_children(parent: Node) -> void:
 	for child in parent.get_children():
 		parent.remove_child(child)
 		child.free()
+
+
+func _reset_player_health() -> void:
+	if _player == null:
+		return
+	var ph: Node = _player.get_node_or_null("PlayerHealth")
+	if ph != null and ph.has_method("reset_health"):
+		ph.reset_health()
+
+
+func _reset_expedition_map() -> void:
+	if _expedition_map != null and _expedition_map.has_method("reset"):
+		_expedition_map.reset()

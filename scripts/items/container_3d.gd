@@ -34,6 +34,17 @@ func _ready() -> void:
 	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
 
 
+## Restore this container to its initial (unopened) state.
+func reset() -> void:
+	_is_cracked = false
+	_crack_progress = 0.0
+	_is_cracking = false
+	_player_in_range = false
+	_search_entries.clear()
+	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
+
+
+
 func _process(delta: float) -> void:
 	if _is_cracked:
 		return
