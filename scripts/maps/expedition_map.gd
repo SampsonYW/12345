@@ -1,70 +1,153 @@
 # expedition_map.gd
 # Self-contained expedition map script.
-# Owns: risk zones, container wiring, container interactions, collision management.
+# 整图由 POI 驱动：_ready 时清空 .tscn 里手摆的 Obstacles/Containers/InitialSpawns/RiskZones 子节点，
+# 然后从 POI_REGISTRY 注册的每个 POI 模块自包含构建。
+#
+# @tool: 在 Godot 编辑器中打开 expedition_map.tscn 时，_ready 也会触发，编辑器 3D 视图能直接预览整张地图。
+# 编辑器中"保存场景"会把 .tscn 中残留的旧节点（24 障碍 + 30 容器 + 14 spawn + 6 zone marker）永久删除；
+# POI 生成的节点（owner=null）不会被保存，保持代码驱动。
+# [AI-ASSISTED] 2026-05-23 - 从 RISK_ZONE_DATA 常量 + tscn 手摆迁移到 POI 驱动
+@tool
 extends Node3D
 
-const EXPEDITION_BOUNDS := Rect2(Vector2(-300.0, -175.0), Vector2(600.0, 350.0))
-const RISK_ZONE_DATA := [
-	{
-		"name": "Ash Outskirts",
-		"center": Vector2(-132.0, 0.0),
-		"size": Vector2(192.0, 210.0),
-		"risk": "low",
-		"enemy_density": 0.35,
-		"container_density": 0.45,
-		"high_value_weight": 0.15,
-	},
-	{
-		"name": "Broken Rail",
-		"center": Vector2(8.0, -22.0),
-		"size": Vector2(176.0, 182.0),
-		"risk": "low",
-		"enemy_density": 0.55,
-		"container_density": 0.65,
-		"high_value_weight": 0.25,
-	},
-	{
-		"name": "Black Yard",
-		"center": Vector2(132.0, 8.0),
-		"size": Vector2(184.0, 214.0),
-		"risk": "high",
-		"enemy_density": 1.35,
-		"container_density": 1.45,
-		"high_value_weight": 0.8,
-	},
-	{
-		"name": "Core Wreck",
-		"center": Vector2(32.0, 66.0),
-		"size": Vector2(120.0, 92.0),
-		"risk": "high",
-		"enemy_density": 1.8,
-		"container_density": 1.7,
-		"high_value_weight": 0.95,
-	},
-	{
-		"name": "Frozen Depot",
-		"center": Vector2(-200.0, 100.0),
-		"size": Vector2(140.0, 100.0),
-		"risk": "low",
-		"enemy_density": 0.42,
-		"container_density": 0.52,
-		"high_value_weight": 0.18,
-	},
-	{
-		"name": "Silent Array",
-		"center": Vector2(220.0, -80.0),
-		"size": Vector2(130.0, 120.0),
-		"risk": "high",
-		"enemy_density": 1.55,
-		"container_density": 1.6,
-		"high_value_weight": 0.88,
-	},
+const CoreWreckPOIScript := preload("res://scripts/maps/core_wreck_poi.gd")
+const SouthApproachPOIScript := preload("res://scripts/maps/south_approach_poi.gd")
+const FrozenDepotPOIScript := preload("res://scripts/maps/frozen_depot_poi.gd")
+const SilentArrayPOIScript := preload("res://scripts/maps/silent_array_poi.gd")
+const BlackYardPOIScript := preload("res://scripts/maps/black_yard_poi.gd")
+const AshOutskirtsPOIScript := preload("res://scripts/maps/ash_outskirts_poi.gd")
+const BrokenRailPOIScript := preload("res://scripts/maps/broken_rail_poi.gd")
+const WastelandDecorationPOIScript := preload("res://scripts/maps/wasteland_decoration_poi.gd")
+
+## 当前注册的所有 POI（按出现顺序 build）
+const POI_REGISTRY: Array = [
+	CoreWreckPOIScript,
+	SouthApproachPOIScript,
+	FrozenDepotPOIScript,
+	SilentArrayPOIScript,
+	BlackYardPOIScript,
+	AshOutskirtsPOIScript,
+	BrokenRailPOIScript,
+	WastelandDecorationPOIScript,
 ]
+
+@export var rebuild_pois_on_ready: bool = true
+
+## 编辑器按钮：把当前 POI 节点位置/旋转写回各 *_poi.gd 文件（保留注释，原文件备份为 .bak）
+@export_tool_button("Dump POI positions to .gd files") var _dump_poi_button: Callable = _dump_all_pois_to_files
+
+const EXPEDITION_BOUNDS := Rect2(Vector2(-300.0, -175.0), Vector2(600.0, 350.0))
+const FALLBACK_ZONE := {"name": "Wasteland", "risk": "low"}
 
 var _player: Node3D = null
 var _hud: Node = null
 var _world_prompt: Label3D = null
 var _container_hint_shown: bool = false
+var _pois_built: bool = false
+var _risk_zones: Array = []   # 由 POI build 时填充，运行时唯一 zone 数据源
+
+
+func _ready() -> void:
+	if not rebuild_pois_on_ready:
+		return
+	# 编辑器内每次场景重载都重建（用户改 POI 数据后能立刻看到）
+	# 运行时只建一次
+	if Engine.is_editor_hint():
+		_pois_built = false
+	if _pois_built:
+		return
+	_clear_authored_content()
+	_build_pois()
+	_pois_built = true
+	if Engine.is_editor_hint():
+		print("[expedition_map] @tool editor preview built. 保存场景 (Ctrl+S) 可把 .tscn 里旧节点的清理永久落盘；POI 生成节点不会被保存。")
+
+
+## 清空 .tscn 手摆的 Obstacles/Containers/InitialSpawns/RiskZones 子节点
+## 保留：Ground、根节点、这 4 个父容器节点本身
+func _clear_authored_content() -> void:
+	for parent_name in ["Obstacles", "Containers", "InitialSpawns", "RiskZones"]:
+		var node := get_node_or_null(parent_name) as Node
+		if node == null:
+			continue
+		for child in node.get_children():
+			node.remove_child(child)
+			child.queue_free()
+
+
+func _build_pois() -> void:
+	var parents := {
+		"obstacles": get_node_or_null("Obstacles") as Node3D,
+		"containers": get_node_or_null("Containers") as Node3D,
+		"spawns": get_node_or_null("InitialSpawns") as Node3D,
+		"risk_zones": get_node_or_null("RiskZones") as Node3D,
+	}
+	# 校验所有父容器存在
+	for key in parents:
+		if parents[key] == null:
+			push_warning("[expedition_map] Missing parent node: %s" % key)
+			return
+	_risk_zones.clear()
+	var total_obstacles := 0
+	var total_containers := 0
+	var total_spawns := 0
+	for poi in POI_REGISTRY:
+		var zone_def: Dictionary = poi.build_all(parents)
+		if not zone_def.is_empty():
+			_risk_zones.append(zone_def)
+		# 顺便统计输出
+		total_obstacles += poi.OBSTACLES.size()
+		total_containers += poi.CONTAINERS.size()
+		total_spawns += poi.SPAWNS.size()
+	# 编辑器模式：把顶层 POI 节点（body / container / spawn marker / zone marker）的 owner 设为场景根，
+	# 让它们在 Scene 树面板里显示 + 3D 视图可选中可拖动。
+	# 注意：只设顶层节点 owner，不递归到内部 Mesh/Shape，否则用户在 viewport 会误选 Mesh 而非 body，
+	# 导致拖动只移动局部子节点（body 不动），dump 也读不到真实变化。
+	if Engine.is_editor_hint():
+		_attach_owner_to_poi_roots()
+	print("[expedition_map] built %d POIs · %d obstacles · %d containers · %d spawns" % [
+		POI_REGISTRY.size(), total_obstacles, total_containers, total_spawns
+	])
+
+
+# 只把 4 个父容器（Obstacles / Containers / InitialSpawns / RiskZones）的直接子节点的 owner
+# 设为场景根；不递归进 body 内的 Mesh/Shape。这样：
+#   - Scene 树展开 Obstacles 看到 N 个 body，body 不可展开（Mesh/Shape 隐藏）
+#   - viewport 点击方块直接选中 body，拖动整体移动
+func _attach_owner_to_poi_roots() -> void:
+	for parent_name in ["Obstacles", "Containers", "InitialSpawns", "RiskZones"]:
+		var parent_node := get_node_or_null(parent_name)
+		if parent_node == null:
+			continue
+		for child in parent_node.get_children():
+			if child.owner == null:
+				child.owner = self
+
+
+# 编辑器按钮回调：遍历 POI_REGISTRY，每个 POI 把自己的节点位置写回对应 *_poi.gd
+func _dump_all_pois_to_files() -> void:
+	var parents := {
+		"obstacles": get_node_or_null("Obstacles") as Node3D,
+		"containers": get_node_or_null("Containers") as Node3D,
+		"spawns": get_node_or_null("InitialSpawns") as Node3D,
+		"risk_zones": get_node_or_null("RiskZones") as Node3D,
+	}
+	for key in parents:
+		if parents[key] == null:
+			push_warning("[poi-dump] missing parent node: %s — abort" % key)
+			return
+	for poi in POI_REGISTRY:
+		var result: Dictionary = poi.dump_current_state(parents)
+		if not result.get("ok", false):
+			push_error("[poi-dump] %s failed: %s" % [poi.POI_CLASS_NAME, result.get("error", "?")])
+			continue
+		print("[poi-dump] %s → updated %d obstacles, %d containers, %d spawns" % [
+			poi.POI_CLASS_NAME,
+			result.get("obstacles", 0),
+			result.get("containers", 0),
+			result.get("spawns", 0),
+		])
+	print("[poi-dump] done. 原文件已备份为 *.gd.bak。重新加载场景生效。")
 
 
 func activate(player: Node3D, hud: Node, world_prompt: Label3D = null) -> void:
@@ -101,7 +184,7 @@ func get_bounds() -> Rect2:
 
 func get_risk_zones() -> Array:
 	var zones: Array = []
-	for data in RISK_ZONE_DATA:
+	for data in _risk_zones:
 		zones.append(data.duplicate(true))
 	return zones
 
@@ -115,7 +198,7 @@ func get_zone_density_summary() -> Dictionary:
 	var high_container := 0.0
 	var high_value := 0.0
 	var high_count := 0.0
-	for zone in RISK_ZONE_DATA:
+	for zone in _risk_zones:
 		if zone.get("risk", "") == "high":
 			high_enemy += float(zone.get("enemy_density", 0.0))
 			high_container += float(zone.get("container_density", 0.0))
@@ -137,11 +220,11 @@ func get_zone_density_summary() -> Dictionary:
 
 
 func get_player_zone_info() -> Dictionary:
-	var info := {"name": "Wasteland", "risk": "low"}
+	var info := FALLBACK_ZONE.duplicate()
 	if _player == null:
 		return info
 	var pos := Vector2(_player.global_position.x, _player.global_position.z)
-	for zone in RISK_ZONE_DATA:
+	for zone in _risk_zones:
 		if _zone_contains(zone, pos):
 			info["name"] = zone.get("name", "")
 			info["risk"] = zone.get("risk", "low")
