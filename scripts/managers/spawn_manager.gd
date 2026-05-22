@@ -5,14 +5,18 @@
 extends Node3D
 
 const DEFAULT_SPAWN_POINTS := [
-	Vector3(-210.0, 0.0, -92.0),
-	Vector3(-166.0, 0.0, 88.0),
-	Vector3(-94.0, 0.0, -104.0),
-	Vector3(-24.0, 0.0, 110.0),
-	Vector3(42.0, 0.0, -112.0),
-	Vector3(104.0, 0.0, 96.0),
-	Vector3(178.0, 0.0, -78.0),
-	Vector3(224.0, 0.0, 48.0),
+	Vector3(-270.0, 0.0, -140.0),
+	Vector3(-200.0, 0.0, 140.0),
+	Vector3(-100.0, 0.0, -155.0),
+	Vector3(0.0, 0.0, 145.0),
+	Vector3(80.0, 0.0, -158.0),
+	Vector3(160.0, 0.0, 130.0),
+	Vector3(240.0, 0.0, -145.0),
+	Vector3(280.0, 0.0, 80.0),
+	Vector3(-280.0, 0.0, -50.0),
+	Vector3(-260.0, 0.0, 80.0),
+	Vector3(150.0, 0.0, 150.0),
+	Vector3(-150.0, 0.0, -140.0),
 ]
 
 @export var signal_flare_multiplier: float = 3.0
@@ -69,6 +73,10 @@ func configure(enemy_parent: Node, patrol_scene: PackedScene, dormant_scene: Pac
 	_enemy_parent = enemy_parent
 	_patrol_scene = patrol_scene
 	_dormant_scene = dormant_scene
+
+
+func get_spawn_points() -> Array[Vector3]:
+	return _spawn_points.duplicate()
 
 
 func seed_initial_enemies() -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=61 format=3 uid="uid://expeditionmap00001"]
+[gd_scene load_steps=71 format=3 uid="uid://expeditionmap00001"]
 
 [ext_resource type="PackedScene" path="res://scenes/container_3d.tscn" id="1_container"]
 [ext_resource type="Resource" path="res://resources/items/relic_small.tres" id="2_relic"]
@@ -11,11 +11,11 @@
 albedo_color = Color(0.13, 0.18, 0.13, 1)
 
 [sub_resource type="BoxMesh" id="mesh_ground"]
-size = Vector3(480, 0.1, 240)
+size = Vector3(600, 0.1, 350)
 material = SubResource("mat_ground")
 
 [sub_resource type="BoxShape3D" id="shape_ground"]
-size = Vector3(480, 0.1, 240)
+size = Vector3(600, 0.1, 350)
 
 [sub_resource type="StandardMaterial3D" id="mat_zone_low"]
 transparency = 1
@@ -52,6 +52,14 @@ material = SubResource("mat_zone_high")
 
 [sub_resource type="BoxShape3D" id="shape_zone4"]
 size = Vector3(184, 0.03, 214)
+
+[sub_resource type="BoxMesh" id="mesh_zone5"]
+size = Vector3(140, 0.03, 100)
+material = SubResource("mat_zone_low")
+
+[sub_resource type="BoxMesh" id="mesh_zone6"]
+size = Vector3(130, 0.03, 120)
+material = SubResource("mat_zone_high")
 
 [sub_resource type="StandardMaterial3D" id="mat_obstacle"]
 albedo_color = Color(0.28, 0.27, 0.25, 1)
@@ -197,6 +205,34 @@ material = SubResource("mat_obstacle")
 [sub_resource type="BoxShape3D" id="shape_obs20"]
 size = Vector3(12, 1.2, 5)
 
+[sub_resource type="BoxMesh" id="mesh_obs21"]
+size = Vector3(22, 1.5, 8)
+material = SubResource("mat_obstacle")
+
+[sub_resource type="BoxShape3D" id="shape_obs21"]
+size = Vector3(22, 1.5, 8)
+
+[sub_resource type="BoxMesh" id="mesh_obs22"]
+size = Vector3(10, 1.2, 20)
+material = SubResource("mat_obstacle")
+
+[sub_resource type="BoxShape3D" id="shape_obs22"]
+size = Vector3(10, 1.2, 20)
+
+[sub_resource type="BoxMesh" id="mesh_obs23"]
+size = Vector3(18, 2.2, 6)
+material = SubResource("mat_obstacle")
+
+[sub_resource type="BoxShape3D" id="shape_obs23"]
+size = Vector3(18, 2.2, 6)
+
+[sub_resource type="BoxMesh" id="mesh_obs24"]
+size = Vector3(8, 2.6, 24)
+material = SubResource("mat_obstacle")
+
+[sub_resource type="BoxShape3D" id="shape_obs24"]
+size = Vector3(8, 2.6, 24)
+
 [node name="ExpeditionMap" type="Node3D"]
 script = ExtResource("6_script")
 
@@ -228,6 +264,14 @@ mesh = SubResource("mesh_zone3")
 [node name="BlackYard" type="MeshInstance3D" parent="RiskZones"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 132, 0.015, 8)
 mesh = SubResource("mesh_zone4")
+
+[node name="FrozenDepot" type="MeshInstance3D" parent="RiskZones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -200, 0.015, 100)
+mesh = SubResource("mesh_zone5")
+
+[node name="SilentArray" type="MeshInstance3D" parent="RiskZones"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 220, 0.015, -80)
+mesh = SubResource("mesh_zone6")
 
 [node name="Obstacles" type="Node3D" parent="."]
 
@@ -451,10 +495,54 @@ mesh = SubResource("mesh_obs20")
 [node name="Shape" type="CollisionShape3D" parent="Obstacles/YardBarrier1"]
 shape = SubResource("shape_obs20")
 
+[node name="FrozenDepotCrates" type="StaticBody3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -220, 0.75, 118)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="Obstacles/FrozenDepotCrates"]
+mesh = SubResource("mesh_obs21")
+
+[node name="Shape" type="CollisionShape3D" parent="Obstacles/FrozenDepotCrates"]
+shape = SubResource("shape_obs21")
+
+[node name="FrozenDepotPipe" type="StaticBody3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -175, 0.6, 92)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="Obstacles/FrozenDepotPipe"]
+mesh = SubResource("mesh_obs22")
+
+[node name="Shape" type="CollisionShape3D" parent="Obstacles/FrozenDepotPipe"]
+shape = SubResource("shape_obs22")
+
+[node name="SilentArrayTowerBase" type="StaticBody3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 210, 1.1, -92)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="Obstacles/SilentArrayTowerBase"]
+mesh = SubResource("mesh_obs23")
+
+[node name="Shape" type="CollisionShape3D" parent="Obstacles/SilentArrayTowerBase"]
+shape = SubResource("shape_obs23")
+
+[node name="SilentArrayAntennaRack" type="StaticBody3D" parent="Obstacles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 1.3, -54)
+collision_layer = 4
+collision_mask = 0
+
+[node name="Mesh" type="MeshInstance3D" parent="Obstacles/SilentArrayAntennaRack"]
+mesh = SubResource("mesh_obs24")
+
+[node name="Shape" type="CollisionShape3D" parent="Obstacles/SilentArrayAntennaRack"]
+shape = SubResource("shape_obs24")
+
 [node name="Containers" type="Node3D" parent="."]
 
 [node name="Container1" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -170, 0, -35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -165, 0, -30)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo"), ExtResource("4_battery")])
 risk = "low"
 
@@ -469,17 +557,17 @@ loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3
 risk = "low"
 
 [node name="Container4" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -115, 0, 65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -110, 0, 60)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic")])
 risk = "low"
 
 [node name="Container5" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -195, 0, 75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -188, 0, 68)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo")])
 risk = "low"
 
 [node name="Container6" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, -12)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("4_battery"), ExtResource("3_ammo")])
 risk = "low"
 
@@ -494,7 +582,7 @@ loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("4
 risk = "low"
 
 [node name="Container9" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0, -85)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, -80)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo")])
 risk = "low"
 
@@ -504,22 +592,22 @@ loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2
 risk = "low"
 
 [node name="Container11" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, 45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 40)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic"), ExtResource("3_ammo")])
 risk = "high"
 
 [node name="Container12" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 0, 55)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0, 58)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("5_purifier"), ExtResource("3_ammo")])
 risk = "high"
 
 [node name="Container13" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 0, 75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 72)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic"), ExtResource("4_battery")])
 risk = "high"
 
 [node name="Container14" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55, 0, 85)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58, 0, 90)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo"), ExtResource("5_purifier")])
 risk = "high"
 
@@ -534,32 +622,32 @@ loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2
 risk = "high"
 
 [node name="Container17" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 115, 0, -25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 110, 0, -20)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("5_purifier"), ExtResource("3_ammo")])
 risk = "high"
 
 [node name="Container18" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 125, 0, -35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 130, 0, -38)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic"), ExtResource("4_battery")])
 risk = "high"
 
 [node name="Container19" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 165, 0, 35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 160, 0, 28)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic"), ExtResource("3_ammo"), ExtResource("5_purifier")])
 risk = "high"
 
 [node name="Container20" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 175, 0, 45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 178, 0, 52)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo"), ExtResource("2_relic")])
 risk = "high"
 
 [node name="Container21" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 195, 0, -55)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 188, 0, -50)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("5_purifier"), ExtResource("4_battery")])
 risk = "high"
 
 [node name="Container22" parent="Containers" instance=ExtResource("1_container")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 205, 0, -65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 212, 0, -68)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic"), ExtResource("3_ammo")])
 risk = "high"
 
@@ -573,43 +661,73 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 155, 0, 85)
 loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo"), ExtResource("4_battery"), ExtResource("2_relic")])
 risk = "high"
 
+[node name="Container25" parent="Containers" instance=ExtResource("1_container")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -235, 0, 118)
+loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo"), ExtResource("4_battery")])
+risk = "low"
+
+[node name="Container26" parent="Containers" instance=ExtResource("1_container")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -178, 0, 105)
+loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("4_battery")])
+risk = "low"
+
+[node name="Container27" parent="Containers" instance=ExtResource("1_container")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -206, 0, 70)
+loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("3_ammo"), ExtResource("2_relic")])
+risk = "low"
+
+[node name="Container28" parent="Containers" instance=ExtResource("1_container")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 204, 0, -114)
+loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic"), ExtResource("5_purifier")])
+risk = "high"
+
+[node name="Container29" parent="Containers" instance=ExtResource("1_container")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 236, 0, -84)
+loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("2_relic"), ExtResource("2_relic"), ExtResource("3_ammo")])
+risk = "high"
+
+[node name="Container30" parent="Containers" instance=ExtResource("1_container")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 266, 0, -50)
+loot_table = Array[Resource("res://scripts/items/item_data.gd")]([ExtResource("5_purifier"), ExtResource("4_battery"), ExtResource("2_relic")])
+risk = "high"
+
 [node name="InitialSpawns" type="Node3D" parent="."]
 
 [node name="PatrolSpawn1" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -160, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -270, 0, -140)
 
 [node name="PatrolSpawn2" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0, -60)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -100, 0, -155)
 
 [node name="PatrolSpawn3" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 35, 0, 65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 80, 0, -158)
 
 [node name="PatrolSpawn4" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 70)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 240, 0, -145)
 
 [node name="PatrolSpawn5" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 140, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -280, 0, -50)
 
 [node name="PatrolSpawn6" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 185, 0, -10)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -150, 0, -140)
 
 [node name="DormantSpawn1" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -100, 0, -50)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -200, 0, 140)
 
 [node name="DormantSpawn2" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, -30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 145)
 
 [node name="DormantSpawn3" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, 50)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 160, 0, 130)
 
 [node name="DormantSpawn4" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0, 80)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 280, 0, 80)
 
 [node name="DormantSpawn5" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 120, 0, -20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -260, 0, 80)
 
 [node name="DormantSpawn6" type="Marker3D" parent="InitialSpawns"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 170, 0, 40)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 150, 0, 150)
 
 [node name="DormantSpawn7" type="Marker3D" parent="InitialSpawns"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 200, 0, -50)

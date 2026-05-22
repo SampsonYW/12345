@@ -3,7 +3,7 @@
 # Owns: risk zones, container wiring, container interactions, collision management.
 extends Node3D
 
-const EXPEDITION_BOUNDS := Rect2(Vector2(-240.0, -120.0), Vector2(480.0, 240.0))
+const EXPEDITION_BOUNDS := Rect2(Vector2(-300.0, -175.0), Vector2(600.0, 350.0))
 const RISK_ZONE_DATA := [
 	{
 		"name": "Ash Outskirts",
@@ -40,6 +40,24 @@ const RISK_ZONE_DATA := [
 		"enemy_density": 1.8,
 		"container_density": 1.7,
 		"high_value_weight": 0.95,
+	},
+	{
+		"name": "Frozen Depot",
+		"center": Vector2(-200.0, 100.0),
+		"size": Vector2(140.0, 100.0),
+		"risk": "low",
+		"enemy_density": 0.42,
+		"container_density": 0.52,
+		"high_value_weight": 0.18,
+	},
+	{
+		"name": "Silent Array",
+		"center": Vector2(220.0, -80.0),
+		"size": Vector2(130.0, 120.0),
+		"risk": "high",
+		"enemy_density": 1.55,
+		"container_density": 1.6,
+		"high_value_weight": 0.88,
 	},
 ]
 
@@ -137,6 +155,18 @@ func get_player_risk_label() -> String:
 
 func get_containers_node() -> Node:
 	return get_node_or_null("Containers")
+
+
+func collect_obstacle_positions() -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	var obstacles := get_node_or_null("Obstacles")
+	if obstacles == null:
+		return positions
+	for child in obstacles.get_children():
+		if child is Node3D:
+			var node := child as Node3D
+			positions.append(Vector2(node.global_position.x, node.global_position.z))
+	return positions
 
 
 # ---------------------------------------------------------------------------

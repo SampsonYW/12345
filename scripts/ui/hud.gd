@@ -9,6 +9,7 @@ const ITEM_AMMO := preload("res://resources/items/standard_ammo.tres")
 const ITEM_BATTERY := preload("res://resources/items/battery_small.tres")
 const ITEM_PURIFIER := preload("res://resources/items/purifier.tres")
 const STORAGE_DRAG_SLOT_SCRIPT := preload("res://scripts/ui/storage_drag_slot.gd")
+const MINIMAP_SCRIPT := preload("res://scripts/ui/minimap.gd")
 
 const TYPE_COLORS := {
 	ItemDataResource.Type.COLLECTIBLE: Color(0.95, 0.68, 0.25, 1.0),
@@ -46,6 +47,7 @@ var _search_container: Node = null
 var _search_active_index: int = -1
 var _search_feedback_label: Label = null
 var _search_entry_snapshot: Array = []
+var _minimap: Control = null
 var _hold_progress_container: Control = null
 var _hold_progress_fill: ColorRect = null
 var _hold_progress_label: Label = null
@@ -81,6 +83,7 @@ func _ready() -> void:
 	blocked_label.visible = false
 	slots_container.visible = false
 	_build_status_labels()
+	_build_minimap()
 	_build_slot_panels()
 	_build_prompt_labels()
 	_build_main_overlay()
@@ -216,6 +219,24 @@ func _build_prompt_labels() -> void:
 	_prompt_label.add_theme_color_override("font_color", Color(0.92, 0.98, 0.94, 1.0))
 	add_child(_prompt_label)
 	_build_hold_progress()
+
+
+func _build_minimap() -> void:
+	_minimap = Control.new()
+	_minimap.name = "Minimap"
+	_minimap.set_script(MINIMAP_SCRIPT)
+	_minimap.layout_mode = 1
+	_minimap.anchor_left = 0.0
+	_minimap.anchor_top = 1.0
+	_minimap.anchor_right = 0.0
+	_minimap.anchor_bottom = 1.0
+	_minimap.offset_left = 20.0
+	_minimap.offset_top = -150.0
+	_minimap.offset_right = 260.0
+	_minimap.offset_bottom = -30.0
+	_minimap.visible = false
+	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_minimap)
 
 
 func _build_hold_progress() -> void:
@@ -1092,6 +1113,8 @@ func _set_run_hud_visible(show: bool) -> void:
 	slots_container.visible = false
 	if _prompt_label != null:
 		_prompt_label.visible = false
+	if _minimap != null:
+		_minimap.visible = show and GameManager.current_location == GameManager.Location.EXPEDITION
 	blocked_label.visible = show and blocked_label.visible
 
 
@@ -1189,14 +1212,20 @@ func _on_location_changed(location: int) -> void:
 		set_risk_label_text("Risk  Title")
 		if _zone_container != null:
 			_zone_container.visible = false
+		if _minimap != null:
+			_minimap.visible = false
 	elif location == GameManager.Location.AFTERGLOW:
 		set_risk_label_text("Afterglow Express")
 		if _zone_container != null:
 			_zone_container.visible = false
+		if _minimap != null:
+			_minimap.visible = false
 	elif location == GameManager.Location.EXPEDITION:
 		set_risk_label_text("Risk  Low Risk")
 		if _zone_container != null:
 			_zone_container.visible = true
+		if _minimap != null:
+			_minimap.visible = true
 
 
 func _update_time_label() -> void:
