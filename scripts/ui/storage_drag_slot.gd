@@ -1,7 +1,7 @@
 # storage_drag_slot.gd
 # UI 拖拽槽包装器：使 HUD 的背包、容器、仓库列表支持 Godot 拖拽（Drag & Drop）交互。
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
-extends PanelContainer
+extends Control
 
 var owner_hud: Node = null
 var drag_payload: Dictionary = {}

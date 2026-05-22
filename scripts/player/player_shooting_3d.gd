@@ -77,9 +77,10 @@ func _build_bullet_pool() -> void:
 	if bullet_scene == null:
 		return
 	var parent := _find_projectile_parent()
-	for i in bullet_pool_size:
+	var needed = bullet_pool_size - _bullet_pool.size()
+	for i in needed:
 		var bullet: Area3D = bullet_scene.instantiate()
-		bullet.name = "Bullet3DPool%d" % i
+		bullet.name = "Bullet3DPool%d" % Time.get_ticks_usec()
 		parent.add_child(bullet)
 		if bullet.has_method("deactivate"):
 			bullet.deactivate()
@@ -87,8 +88,15 @@ func _build_bullet_pool() -> void:
 
 
 func _get_pooled_bullet() -> Area3D:
+	for i in range(_bullet_pool.size() - 1, -1, -1):
+		if not is_instance_valid(_bullet_pool[i]):
+			_bullet_pool.remove_at(i)
+
+	if _bullet_pool.size() < bullet_pool_size:
+		_build_bullet_pool()
+
 	for bullet in _bullet_pool:
-		if not bullet.visible:
+		if is_instance_valid(bullet) and not bullet.visible:
 			return bullet
 	return null
 

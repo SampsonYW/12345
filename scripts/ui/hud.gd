@@ -1,9 +1,11 @@
 # hud.gd
 # HUD UI 逻辑脚本：管理玩家状态条（HP、侵蚀、弹药）、背包拖拽、容器搜索和母车仓库，以及屏幕边缘敌人警示 wedges。
-# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
+# [AI-ASSISTED] 2026-05-22 — Applied Cyber-Tactical aesthetic overhaul
 extends Control
 
-const EMPTY_SLOT_COLOR := Color(0.12, 0.12, 0.12, 0.72)
+const EMPTY_SLOT_COLOR := Color(0.04, 0.05, 0.06, 0.72)
+const SLOT_BORDER_COLOR := Color(0.1, 0.3, 0.4, 0.5)
+const ACCENT_COLOR := Color(0.1, 0.85, 0.9, 1.0)
 const START_KEYS := [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]
 const SHORTCUT_KEYS := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8]
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
@@ -125,6 +127,7 @@ func _ready() -> void:
 	_on_state_changed(GameManager.current_state)
 	_update_time_label()
 	_update_signal_label()
+	_apply_cyber_tactical_theme()
 	call_deferred("_restore_launch_screen")
 
 
@@ -193,6 +196,59 @@ func _mark_input_as_handled() -> void:
 		viewport.set_input_as_handled()
 
 
+func _apply_cyber_tactical_theme() -> void:
+	# Create backing panels for TopLeft and TopRight
+	var tl_panel := PanelContainer.new()
+	tl_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tl_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	tl_panel.offset_left = 24
+	tl_panel.offset_top = 24
+	var tl_style := _make_panel_style(Color(0.03, 0.04, 0.05, 0.85))
+	tl_style.border_width_left = 3
+	tl_style.border_color = ACCENT_COLOR
+	tl_panel.add_theme_stylebox_override("panel", tl_style)
+	remove_child(top_left)
+	add_child(tl_panel)
+	tl_panel.add_child(top_left)
+
+	var tr_panel := PanelContainer.new()
+	tr_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tr_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	tr_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	tr_panel.offset_right = -24
+	tr_panel.offset_top = 24
+	var tr_style := _make_panel_style(Color(0.03, 0.04, 0.05, 0.85))
+	tr_style.border_width_right = 3
+	tr_style.border_color = Color(0.9, 0.5, 0.1, 0.8) # Orange accent for info
+	tr_panel.add_theme_stylebox_override("panel", tr_style)
+	remove_child(top_right)
+	top_right.custom_minimum_size = Vector2(160, 0)
+	add_child(tr_panel)
+	tr_panel.add_child(top_right)
+
+	# Style ProgressBars
+	_style_progress_bar(hp_bar, Color(0.2, 0.8, 0.4, 1.0))
+	_style_progress_bar(erosion_bar, Color(0.8, 0.3, 0.8, 1.0))
+
+	# Clean up Labels with subtle shadow
+	for child in top_left.get_children() + top_right.get_children():
+		if child is Label:
+			child.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+			child.add_theme_constant_override("shadow_offset_x", 1)
+			child.add_theme_constant_override("shadow_offset_y", 1)
+
+
+func _style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.0, 0.0, 0.0, 0.5)
+	bg.set_corner_radius_all(2)
+	bar.add_theme_stylebox_override("background", bg)
+	var fg := StyleBoxFlat.new()
+	fg.bg_color = fill_color
+	fg.set_corner_radius_all(2)
+	bar.add_theme_stylebox_override("fill", fg)
+
+
 func _build_status_labels() -> void:
 	_state_label = _make_status_label("状态  准备中")
 	_time_label = _make_status_label("时间  00:00")
@@ -216,23 +272,20 @@ func _build_status_labels() -> void:
 
 	_zone_name_label = Label.new()
 	_zone_name_label.name = "ZoneNameLabel"
-	_zone_name_label.layout_mode = 2
 	_zone_name_label.text = ""
-	_zone_name_label.add_theme_font_size_override("font_size", 18)
+	_zone_name_label.add_theme_font_size_override("font_size", 24)
 	_zone_container.add_child(_zone_name_label)
 
 	_zone_risk_label = Label.new()
 	_zone_risk_label.name = "ZoneRiskLabel"
-	_zone_risk_label.layout_mode = 2
 	_zone_risk_label.text = ""
-	_zone_risk_label.add_theme_font_size_override("font_size", 15)
+	_zone_risk_label.add_theme_font_size_override("font_size", 20)
 	_zone_container.add_child(_zone_risk_label)
 
 
 func _build_prompt_labels() -> void:
 	_prompt_label = Label.new()
 	_prompt_label.name = "PromptLabel"
-	_prompt_label.layout_mode = 1
 	_prompt_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_prompt_label.anchor_left = 0.5
 	_prompt_label.anchor_top = 1.0
@@ -244,7 +297,7 @@ func _build_prompt_labels() -> void:
 	_prompt_label.offset_bottom = -116.0
 	_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_prompt_label.add_theme_font_size_override("font_size", 18)
+	_prompt_label.add_theme_font_size_override("font_size", 24)
 	_prompt_label.add_theme_color_override("font_color", Color(0.92, 0.98, 0.94, 1.0))
 	add_child(_prompt_label)
 	_build_hold_progress()
@@ -254,7 +307,6 @@ func _build_minimap() -> void:
 	_minimap = Control.new()
 	_minimap.name = "Minimap"
 	_minimap.set_script(MINIMAP_SCRIPT)
-	_minimap.layout_mode = 1
 	_minimap.anchor_left = 0.0
 	_minimap.anchor_top = 1.0
 	_minimap.anchor_right = 0.0
@@ -272,7 +324,6 @@ func _build_hold_progress() -> void:
 	# Container: centered bottom, above PromptLabel
 	_hold_progress_container = Control.new()
 	_hold_progress_container.name = "HoldProgress"
-	_hold_progress_container.layout_mode = 1
 	_hold_progress_container.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	_hold_progress_container.anchor_left = 0.5
 	_hold_progress_container.anchor_top = 1.0
@@ -297,7 +348,6 @@ func _build_hold_progress() -> void:
 	# Fill bar
 	_hold_progress_fill = ColorRect.new()
 	_hold_progress_fill.name = "Fill"
-	_hold_progress_fill.layout_mode = 1
 	_hold_progress_fill.anchor_left = 0.0
 	_hold_progress_fill.anchor_top = 0.0
 	_hold_progress_fill.anchor_right = 0.0
@@ -313,11 +363,10 @@ func _build_hold_progress() -> void:
 	# Label overlay
 	_hold_progress_label = Label.new()
 	_hold_progress_label.name = "Label"
-	_hold_progress_label.layout_mode = 1
 	_hold_progress_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_hold_progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hold_progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_hold_progress_label.add_theme_font_size_override("font_size", 16)
+	_hold_progress_label.add_theme_font_size_override("font_size", 20)
 	_hold_progress_label.add_theme_color_override("font_color", Color(0.96, 0.96, 0.96, 1.0))
 	_hold_progress_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hold_progress_container.add_child(_hold_progress_label)
@@ -326,19 +375,26 @@ func _build_hold_progress() -> void:
 func _build_slot_panels() -> void:
 	for i in 8:
 		var panel := Panel.new()
-		panel.custom_minimum_size = Vector2(60, 60)
+		panel.custom_minimum_size = Vector2(80, 80)
 		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 		var fill := ColorRect.new()
 		fill.name = "Fill"
 		fill.set_anchors_preset(Control.PRESET_FULL_RECT)
-		fill.offset_left = 4.0
-		fill.offset_top = 4.0
-		fill.offset_right = -4.0
-		fill.offset_bottom = -4.0
+		fill.offset_left = 2.0
+		fill.offset_top = 2.0
+		fill.offset_right = -2.0
+		fill.offset_bottom = -2.0
 		fill.color = EMPTY_SLOT_COLOR
 		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(fill)
+
+		var border := ReferenceRect.new()
+		border.set_anchors_preset(Control.PRESET_FULL_RECT)
+		border.border_color = SLOT_BORDER_COLOR
+		border.border_width = 1.0
+		border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(border)
 
 		var num := Label.new()
 		num.name = "Num"
@@ -353,7 +409,7 @@ func _build_slot_panels() -> void:
 		name_label.position = Vector2(6.0, 36.0)
 		name_label.size = Vector2(48.0, 20.0)
 		name_label.clip_text = true
-		name_label.add_theme_font_size_override("font_size", 11)
+		name_label.add_theme_font_size_override("font_size", 18)
 		name_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.92))
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(name_label)
@@ -366,7 +422,7 @@ func _build_main_overlay() -> void:
 	_main_overlay = ColorRect.new()
 	_main_overlay.name = "MainOverlay"
 	_main_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_main_overlay.color = Color(0.035, 0.045, 0.04, 0.94)
+	_main_overlay.color = Color(0.02, 0.03, 0.04, 0.94) # Darker cyber blue
 	_main_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	_main_overlay.gui_input.connect(_on_main_overlay_gui_input)
 	add_child(_main_overlay)
@@ -391,14 +447,14 @@ func _build_main_overlay() -> void:
 	_main_prompt_label = Label.new()
 	_main_prompt_label.text = "点击任意位置开始"
 	_main_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_main_prompt_label.add_theme_font_size_override("font_size", 18)
+	_main_prompt_label.add_theme_font_size_override("font_size", 24)
 	_main_prompt_label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.82, 1.0))
 	content.add_child(_main_prompt_label)
 
 	_main_summary_label = Label.new()
 	_main_summary_label.visible = false
 	_main_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_main_summary_label.add_theme_font_size_override("font_size", 16)
+	_main_summary_label.add_theme_font_size_override("font_size", 20)
 	_main_summary_label.add_theme_color_override("font_color", Color(0.90, 0.96, 0.92, 1.0))
 	content.add_child(_main_summary_label)
 
@@ -430,13 +486,13 @@ func _build_result_overlay() -> void:
 
 	_result_title_label = Label.new()
 	_result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_result_title_label.add_theme_font_size_override("font_size", 34)
+	_result_title_label.add_theme_font_size_override("font_size", 42)
 	_result_title_label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.74, 1.0))
 	content.add_child(_result_title_label)
 
 	_result_stats_label = Label.new()
 	_result_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_result_stats_label.add_theme_font_size_override("font_size", 18)
+	_result_stats_label.add_theme_font_size_override("font_size", 22)
 	_result_stats_label.add_theme_color_override("font_color", Color(0.90, 0.96, 0.92, 1.0))
 	content.add_child(_result_stats_label)
 
@@ -455,9 +511,9 @@ func _build_result_overlay() -> void:
 
 func _make_status_label(text: String) -> Label:
 	var label := Label.new()
-	label.layout_mode = 2
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.add_theme_font_size_override("font_size", 24)
 	return label
 
 
@@ -549,7 +605,7 @@ func open_backpack() -> void:
 	if _backpack_overlay == null or not is_instance_valid(_backpack_overlay):
 		_backpack_overlay = _build_backpack_overlay()
 		add_child(_backpack_overlay)
-	_populate_backpack_grid(_backpack_overlay.get_node_or_null("BackpackGrid") as GridContainer)
+	_populate_backpack_grid(_backpack_overlay.find_child("BackpackGrid", true, false) as GridContainer)
 	_show_blocking_overlay(_backpack_overlay)
 
 
@@ -558,8 +614,8 @@ func open_storage() -> void:
 	if _storage_overlay == null or not is_instance_valid(_storage_overlay):
 		_storage_overlay = _build_storage_overlay()
 		add_child(_storage_overlay)
-	_populate_backpack_grid(_storage_overlay.get_node_or_null("BackpackGrid") as GridContainer)
-	_populate_warehouse_list(_storage_overlay.get_node_or_null("WarehouseList") as VBoxContainer)
+	_populate_backpack_grid(_storage_overlay.find_child("BackpackGrid", true, false) as GridContainer)
+	_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
 	_show_blocking_overlay(_storage_overlay)
 
 
@@ -574,7 +630,7 @@ func open_container_search(container: Node) -> void:
 	if _search_overlay == null or not is_instance_valid(_search_overlay):
 		_search_overlay = _build_search_overlay()
 		add_child(_search_overlay)
-	_populate_backpack_grid(_search_overlay.get_node_or_null("BackpackGrid") as GridContainer)
+	_populate_backpack_grid(_search_overlay.find_child("BackpackGrid", true, false) as GridContainer)
 	_populate_container_list()
 	_show_blocking_overlay(_search_overlay)
 
@@ -609,16 +665,16 @@ func _show_blocking_overlay(overlay: Control) -> void:
 
 func _get_visible_backpack_grid() -> GridContainer:
 	if _backpack_overlay != null and _backpack_overlay.visible:
-		return _backpack_overlay.get_node_or_null("BackpackGrid") as GridContainer
+		return _backpack_overlay.find_child("BackpackGrid", true, false) as GridContainer
 	if _storage_overlay != null and _storage_overlay.visible:
-		return _storage_overlay.get_node_or_null("BackpackGrid") as GridContainer
+		return _storage_overlay.find_child("BackpackGrid", true, false) as GridContainer
 	if _search_overlay != null and _search_overlay.visible:
-		return _search_overlay.get_node_or_null("BackpackGrid") as GridContainer
+		return _search_overlay.find_child("BackpackGrid", true, false) as GridContainer
 	return null
 
 
 func _build_backpack_overlay() -> Control:
-	var overlay := _make_overlay("BackpackOverlay", Vector2(520.0, 460.0))
+	var overlay := _make_overlay("BackpackOverlay", Vector2(700.0, 600.0))
 	var panel := overlay.get_node("Panel") as PanelContainer
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
@@ -626,33 +682,31 @@ func _build_backpack_overlay() -> Control:
 	content.add_child(_make_overlay_title("背包"))
 	var grid := _make_backpack_grid()
 	content.add_child(grid)
-	var direct_grid := _make_backpack_grid()
-	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_position_overlay_child(direct_grid, Vector2(-180.0, -130.0), Vector2(180.0, 90.0))
-	overlay.add_child(direct_grid)
 	content.add_child(_make_hint_label("按 Esc 或 B 关闭。关闭后快捷键仍可使用。"))
 	return overlay
 
 
 func _build_storage_overlay() -> Control:
-	var overlay := _make_overlay("StorageOverlay", Vector2(860.0, 500.0))
+	var overlay := _make_overlay("StorageOverlay", Vector2(1100.0, 700.0))
 	var panel := overlay.get_node("Panel") as PanelContainer
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 24)
+	columns.add_theme_constant_override("separation", 160)
 	panel.add_child(columns)
 
 	var left := VBoxContainer.new()
+	left.set_script(STORAGE_DRAG_SLOT_SCRIPT)
+	left.set("owner_hud", self)
+	left.set("accept_target", "backpack_slot")
 	left.custom_minimum_size = Vector2(390.0, 0.0)
 	left.add_theme_constant_override("separation", 12)
 	columns.add_child(left)
 	left.add_child(_make_overlay_title("背包"))
 	left.add_child(_make_backpack_grid())
-	var direct_grid := _make_backpack_grid()
-	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_position_overlay_child(direct_grid, Vector2(-390.0, -160.0), Vector2(-20.0, 120.0))
-	overlay.add_child(direct_grid)
 
 	var right := VBoxContainer.new()
+	right.set_script(STORAGE_DRAG_SLOT_SCRIPT)
+	right.set("owner_hud", self)
+	right.set("accept_target", "warehouse_list")
 	right.custom_minimum_size = Vector2(360.0, 0.0)
 	right.add_theme_constant_override("separation", 10)
 	columns.add_child(right)
@@ -661,12 +715,6 @@ func _build_storage_overlay() -> Control:
 	list.name = "WarehouseList"
 	list.add_theme_constant_override("separation", 6)
 	right.add_child(list)
-	var direct_list := VBoxContainer.new()
-	direct_list.name = "WarehouseList"
-	direct_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	direct_list.add_theme_constant_override("separation", 6)
-	_position_overlay_child(direct_list, Vector2(40.0, -160.0), Vector2(390.0, 120.0))
-	overlay.add_child(direct_list)
 	right.add_child(_make_hint_label(
 		"右键物品可快速转移。拖拽或点击转移按钮也可操作。"
 	))
@@ -674,22 +722,21 @@ func _build_storage_overlay() -> Control:
 
 
 func _build_search_overlay() -> Control:
-	var overlay := _make_overlay("SearchOverlay", Vector2(940.0, 540.0))
+	var overlay := _make_overlay("SearchOverlay", Vector2(1160.0, 740.0))
 	var panel := overlay.get_node("Panel") as PanelContainer
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 24)
+	columns.add_theme_constant_override("separation", 160)
 	panel.add_child(columns)
 
 	var left := VBoxContainer.new()
+	left.set_script(STORAGE_DRAG_SLOT_SCRIPT)
+	left.set("owner_hud", self)
+	left.set("accept_target", "backpack_slot")
 	left.custom_minimum_size = Vector2(390.0, 0.0)
 	left.add_theme_constant_override("separation", 12)
 	columns.add_child(left)
 	left.add_child(_make_overlay_title("背包"))
 	left.add_child(_make_backpack_grid())
-	var direct_grid := _make_backpack_grid()
-	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_position_overlay_child(direct_grid, Vector2(-430.0, -170.0), Vector2(-50.0, 130.0))
-	overlay.add_child(direct_grid)
 
 	var right := VBoxContainer.new()
 	right.custom_minimum_size = Vector2(430.0, 0.0)
@@ -700,12 +747,6 @@ func _build_search_overlay() -> Control:
 	list.name = "ContainerList"
 	list.add_theme_constant_override("separation", 6)
 	right.add_child(list)
-	var direct_list := VBoxContainer.new()
-	direct_list.name = "ContainerList"
-	direct_list.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	direct_list.add_theme_constant_override("separation", 6)
-	_position_overlay_child(direct_list, Vector2(20.0, -170.0), Vector2(430.0, 130.0))
-	overlay.add_child(direct_list)
 	_search_feedback_label = _make_hint_label("")
 	_search_feedback_label.name = "SearchFeedback"
 	right.add_child(_search_feedback_label)
@@ -715,7 +756,7 @@ func _build_search_overlay() -> Control:
 	return overlay
 
 
-func _make_overlay(node_name: String, size: Vector2) -> Control:
+func _make_overlay(node_name: String, overlay_size: Vector2) -> Control:
 	var overlay := ColorRect.new()
 	overlay.name = node_name
 	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -726,10 +767,10 @@ func _make_overlay(node_name: String, size: Vector2) -> Control:
 	var panel := PanelContainer.new()
 	panel.name = "Panel"
 	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -size.x * 0.5
-	panel.offset_top = -size.y * 0.5
-	panel.offset_right = size.x * 0.5
-	panel.offset_bottom = size.y * 0.5
+	panel.offset_left = -overlay_size.x * 0.5
+	panel.offset_top = -overlay_size.y * 0.5
+	panel.offset_right = overlay_size.x * 0.5
+	panel.offset_bottom = overlay_size.y * 0.5
 	panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.055, 0.065, 0.06, 0.88)))
 	overlay.add_child(panel)
 	return overlay
@@ -750,8 +791,11 @@ func _position_overlay_child(
 func _make_overlay_title(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", 24)
-	label.add_theme_color_override("font_color", Color(0.95, 0.90, 0.72, 1.0))
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_color_override("font_color", ACCENT_COLOR)
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	label.add_theme_constant_override("shadow_offset_x", 1)
+	label.add_theme_constant_override("shadow_offset_y", 1)
 	return label
 
 
@@ -759,7 +803,7 @@ func _make_hint_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_font_size_override("font_size", 22)
 	label.add_theme_color_override("font_color", Color(0.72, 0.80, 0.76, 1.0))
 	return label
 
@@ -783,7 +827,7 @@ func _populate_backpack_grid(grid: GridContainer) -> void:
 		slot.set_script(STORAGE_DRAG_SLOT_SCRIPT)
 		slot.set("owner_hud", self)
 		slot.set("accept_target", "backpack_slot")
-		slot.custom_minimum_size = Vector2(86.0, 76.0)
+		slot.custom_minimum_size = Vector2(120.0, 106.0)
 		slot.add_theme_stylebox_override("panel", _make_panel_style(Color(0.08, 0.09, 0.085, 0.82)))
 
 		var box := VBoxContainer.new()
@@ -793,7 +837,7 @@ func _populate_backpack_grid(grid: GridContainer) -> void:
 		var title := Label.new()
 		title.name = "ItemName"
 		title.clip_text = true
-		title.add_theme_font_size_override("font_size", 13)
+		title.add_theme_font_size_override("font_size", 18)
 		title.add_theme_color_override("font_color", Color(0.92, 0.96, 0.90, 1.0))
 		var item: ItemDataResource = slots[i] if i < slots.size() else null
 		title.text = item.item_name if item != null else ""
@@ -807,7 +851,7 @@ func _populate_backpack_grid(grid: GridContainer) -> void:
 
 		var detail := Label.new()
 		detail.text = "栏位 %d" % (i + 1)
-		detail.add_theme_font_size_override("font_size", 11)
+		detail.add_theme_font_size_override("font_size", 15)
 		detail.add_theme_color_override("font_color", Color(0.62, 0.70, 0.66, 1.0))
 		box.add_child(detail)
 
@@ -933,7 +977,7 @@ func _on_context_menu_id_pressed(id: int) -> void:
 	if grid != null:
 		_populate_backpack_grid(grid)
 	if _storage_overlay != null and _storage_overlay.visible:
-		_populate_warehouse_list(_storage_overlay.get_node_or_null("WarehouseList") as VBoxContainer)
+		_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
 	if _search_overlay != null and _search_overlay.visible:
 		_populate_container_list()
 
@@ -975,6 +1019,7 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 		var label := Label.new()
 		label.text = "%s x %d" % [String(item_name), int(_warehouse_stock.get(item_name, 0))]
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.add_theme_font_size_override("font_size", 18)
 		label.add_theme_color_override("font_color", Color(0.90, 0.94, 0.88, 1.0))
 		label.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(label)
@@ -992,7 +1037,7 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 func _populate_container_list() -> void:
 	if _search_overlay == null:
 		return
-	var list := _search_overlay.get_node_or_null("ContainerList") as VBoxContainer
+	var list := _search_overlay.find_child("ContainerList", true, false) as VBoxContainer
 	if list == null:
 		return
 	_clear_ui_children(list)
@@ -1020,6 +1065,7 @@ func _populate_container_list() -> void:
 		row_panel.add_child(row)
 		var label := Label.new()
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.add_theme_font_size_override("font_size", 18)
 		label.add_theme_color_override("font_color", Color(0.90, 0.94, 0.88, 1.0))
 		label.mouse_filter = Control.MOUSE_FILTER_PASS
 		label.text = "%d  %s" % [i + 1, _get_container_entry_label(i)]
@@ -1071,7 +1117,7 @@ func _transfer_container_entry(index: int) -> bool:
 		_set_search_feedback("已移至背包。")
 	else:
 		_set_search_feedback("无法转移物品。")
-	_populate_backpack_grid(_search_overlay.get_node_or_null("BackpackGrid") as GridContainer)
+	_populate_backpack_grid(_search_overlay.find_child("BackpackGrid", true, false) as GridContainer)
 	_populate_container_list()
 	return moved
 
@@ -1094,8 +1140,8 @@ func transfer_backpack_slot_to_storage(slot_index: int) -> bool:
 	var stock_name := _get_storage_name_for_item(removed)
 	_warehouse_stock[stock_name] = int(_warehouse_stock.get(stock_name, 0)) + 1
 	if _storage_overlay != null and _storage_overlay.visible:
-		_populate_backpack_grid(_storage_overlay.get_node_or_null("BackpackGrid") as GridContainer)
-		_populate_warehouse_list(_storage_overlay.get_node_or_null("WarehouseList") as VBoxContainer)
+		_populate_backpack_grid(_storage_overlay.find_child("BackpackGrid", true, false) as GridContainer)
+		_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
 	return true
 
 
@@ -1138,8 +1184,8 @@ func _transfer_warehouse_item(item_name: String) -> bool:
 	if not _inventory.add_item(item):
 		return false
 	_warehouse_stock[item_name] = stock - 1
-	_populate_backpack_grid(_storage_overlay.get_node_or_null("BackpackGrid") as GridContainer)
-	_populate_warehouse_list(_storage_overlay.get_node_or_null("WarehouseList") as VBoxContainer)
+	_populate_backpack_grid(_storage_overlay.find_child("BackpackGrid", true, false) as GridContainer)
+	_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
 	return true
 
 
@@ -1155,23 +1201,25 @@ func _set_search_feedback(text: String) -> void:
 		_search_feedback_label.text = text
 
 
-func _make_panel_style(color: Color) -> StyleBoxFlat:
+func _make_panel_style(bg_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.border_color = Color(0.42, 0.48, 0.42, 0.7)
+	style.bg_color = bg_color
+	style.border_color = Color(0.1, 0.4, 0.5, 0.6)
 	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
-	style.content_margin_left = 14.0
-	style.content_margin_right = 14.0
-	style.content_margin_top = 14.0
-	style.content_margin_bottom = 14.0
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 16.0
+	style.content_margin_right = 16.0
+	style.content_margin_top = 16.0
+	style.content_margin_bottom = 16.0
+	style.shadow_color = Color(0, 0, 0, 0.5)
+	style.shadow_size = 6
 	return style
 
 
 func _clear_ui_children(parent: Node) -> void:
 	for child in parent.get_children():
 		parent.remove_child(child)
-		child.free()
+		child.queue_free()
 
 
 func _process_container_search(delta: float) -> void:
@@ -1275,7 +1323,7 @@ func _save_search_snapshot() -> void:
 func _update_container_search_labels() -> void:
 	if _search_overlay == null:
 		return
-	var list := _search_overlay.get_node_or_null("ContainerList") as VBoxContainer
+	var list := _search_overlay.find_child("ContainerList", true, false) as VBoxContainer
 	if list == null:
 		return
 	var children := list.get_children()
@@ -1289,26 +1337,33 @@ func _update_container_search_labels() -> void:
 			label.text = "%d  %s" % [i + 1, _get_container_entry_label(i)]
 
 
-func _show_main_overlay(show: bool) -> void:
+func _show_main_overlay(is_show: bool) -> void:
 	if _main_overlay != null:
-		_main_overlay.visible = show
-	if show and _result_overlay != null:
+		_main_overlay.visible = is_show
+	if is_show and _result_overlay != null:
 		_result_overlay.visible = false
-	if show:
+	if is_show:
 		close_blocking_overlay()
-	_set_run_hud_visible(not show)
+	_set_run_hud_visible(not is_show)
 
 
-func _set_run_hud_visible(show: bool) -> void:
-	top_left.visible = show
-	top_right.visible = show
+func _set_run_hud_visible(is_show: bool) -> void:
+	if top_left.get_parent() is PanelContainer:
+		top_left.get_parent().visible = is_show
+	else:
+		top_left.visible = is_show
+
+	if top_right.get_parent() is PanelContainer:
+		top_right.get_parent().visible = is_show
+	else:
+		top_right.visible = is_show
 	slots_container.visible = false
 	if _prompt_label != null:
 		_prompt_label.visible = false
 	if _minimap != null:
 		var is_expedition := GameManager.current_location == GameManager.Location.EXPEDITION
-		_minimap.visible = show and is_expedition
-	blocked_label.visible = show and blocked_label.visible
+		_minimap.visible = is_show and is_expedition
+	blocked_label.visible = is_show and blocked_label.visible
 
 
 func _on_title_clicked() -> void:

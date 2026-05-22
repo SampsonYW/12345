@@ -286,7 +286,7 @@ func _set_risk_label_text(text: String) -> void:
 func _clear_children(parent: Node) -> void:
 	for child in parent.get_children():
 		parent.remove_child(child)
-		child.free()
+		child.queue_free()
 
 
 func _reset_player_health() -> void:

@@ -34,10 +34,10 @@ func deactivate() -> void:
 	_active_point = ""
 
 
-func update(delta: float) -> void:
+func update(_delta: float) -> void:
 	if _player == null:
 		return
-	_update_interactions(delta)
+	_update_interactions(_delta)
 
 
 ## Test helper: place the player near a named interaction point.

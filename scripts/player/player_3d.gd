@@ -129,7 +129,6 @@ const FLARE_MARKER_SCENE := preload("res://scenes/signal_flare_marker.tscn")
 
 func _spawn_signal_flare_marker() -> void:
 	var marker := FLARE_MARKER_SCENE.instantiate() as Node3D
-	marker.global_position = global_position
 
 	# MeshInstance3D check helper to satisfy static checks
 	var _mesh_ref := marker.get_node_or_null("SignalBeam") as MeshInstance3D
@@ -138,6 +137,7 @@ func _spawn_signal_flare_marker() -> void:
 	if parent == null:
 		parent = get_parent()
 	parent.add_child(marker)
+	marker.global_position = global_position
 	get_tree().create_timer(4.0).timeout.connect(Callable(marker, "queue_free"))
 
 

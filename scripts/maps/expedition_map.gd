@@ -97,7 +97,7 @@ func reset() -> void:
 
 
 
-func update(delta: float) -> void:
+func update(_delta: float) -> void:
 	if _player == null:
 		return
 	_update_risk_label()
