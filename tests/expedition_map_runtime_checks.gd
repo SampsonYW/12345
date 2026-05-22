@@ -57,7 +57,8 @@ func _run() -> void:
 
 	_expect(hud != null and hud.has_method("get_risk_label_text"), "HUD exposes risk label")
 	if hud != null and hud.has_method("get_risk_label_text"):
-		_expect(hud.get_risk_label_text().to_lower().find("risk") >= 0, "HUD shows current risk-zone label")
+		var label_text: String = hud.get_risk_label_text().to_lower()
+		_expect(label_text.find("risk") >= 0 or label_text.find("风险") >= 0, "HUD shows current risk-zone label")
 
 	_finish(scene)
 
