@@ -72,6 +72,10 @@ var _hold_progress_label: Label = null
 var _spawn_manager: Node = null
 var _alert_indicators: Array[Dictionary] = []  # [{screen_pos, opacity, direction}]
 var _spawn_pulses: Array[Dictionary] = []  # [{screen_pos, remaining, max_time, direction}]
+var _context_menu: PopupMenu = null
+var _context_slot_index: int = -1
+var _context_warehouse_name: String = ""
+var _context_container_index: int = -1
 var _warehouse_stock := {
 	"标准弹药": 12,
 	"能量电池": 6,
@@ -664,7 +668,7 @@ func _build_storage_overlay() -> Control:
 	_position_overlay_child(direct_list, Vector2(40.0, -160.0), Vector2(390.0, 120.0))
 	overlay.add_child(direct_list)
 	right.add_child(_make_hint_label(
-		"行显示库存。转移按钮共享相同的物品操作接口。"
+		"右键物品可快速转移。拖拽或点击转移按钮也可操作。"
 	))
 	return overlay
 
@@ -706,7 +710,7 @@ func _build_search_overlay() -> Control:
 	_search_feedback_label.name = "SearchFeedback"
 	right.add_child(_search_feedback_label)
 	right.add_child(_make_hint_label(
-		"搜索自动开始。请将发现的物品移入背包。"
+		"右键已发现物品可快速转移到背包。"
 	))
 	return overlay
 
@@ -806,7 +810,146 @@ func _populate_backpack_grid(grid: GridContainer) -> void:
 		detail.add_theme_font_size_override("font_size", 11)
 		detail.add_theme_color_override("font_color", Color(0.62, 0.70, 0.66, 1.0))
 		box.add_child(detail)
+
+		# Right-click context menu support
+		slot.gui_input.connect(_on_backpack_slot_gui_input.bind(i))
 		grid.add_child(slot)
+
+
+func _on_backpack_slot_gui_input(event: InputEvent, slot_index: int) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_RIGHT:
+		return
+	var loc := GameManager.current_location
+	if loc != GameManager.Location.EXPEDITION and loc != GameManager.Location.AFTERGLOW:
+		return
+	var item: ItemDataResource = null
+	if _inventory != null and _inventory.has_method("get_slot_item"):
+		item = _inventory.get_slot_item(slot_index)
+	if item == null:
+		return
+	_context_slot_index = slot_index
+	_show_context_menu_at(event.global_position, item, loc)
+
+
+func _on_warehouse_row_gui_input(event: InputEvent, item_name: String) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_RIGHT:
+		return
+	if int(_warehouse_stock.get(item_name, 0)) <= 0:
+		return
+	_context_warehouse_name = item_name
+	var menu := _prepare_context_menu()
+	menu.add_item("%s  x%d" % [item_name, int(_warehouse_stock.get(item_name, 0))], 0)
+	menu.set_item_disabled(0, true)
+	menu.add_separator()
+	menu.add_item("转移到背包", 4)
+	_finalize_context_menu(event.global_position)
+
+
+func _on_container_row_gui_input(event: InputEvent, entry_index: int) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	if not event.pressed or event.button_index != MOUSE_BUTTON_RIGHT:
+		return
+	if not _can_transfer_container_entry(entry_index):
+		return
+	_context_container_index = entry_index
+	var label_text := _get_container_entry_label(entry_index)
+	var menu := _prepare_context_menu()
+	menu.add_item(label_text, 0)
+	menu.set_item_disabled(0, true)
+	menu.add_separator()
+	menu.add_item("转移到背包", 5)
+	_finalize_context_menu(event.global_position)
+
+
+func _show_context_menu_at(at_position: Vector2, item: ItemDataResource, loc: int) -> void:
+	var menu := _prepare_context_menu()
+	# Item header (disabled, just for display)
+	var type_name := _get_item_type_name(item.type)
+	menu.add_item("%s  [%s]" % [item.item_name, type_name], 0)
+	menu.set_item_disabled(0, true)
+	menu.add_separator()
+
+	if loc == GameManager.Location.EXPEDITION:
+		# Use action
+		var can_use := item.type != ItemDataResource.Type.COLLECTIBLE
+		menu.add_item("使用", 1)
+		if not can_use:
+			var use_idx := menu.get_item_index(1)
+			menu.set_item_disabled(use_idx, true)
+			menu.set_item_tooltip(use_idx, "残响碎片仅在撤离后结算分数")
+		# Discard action
+		menu.add_item("丢弃", 2)
+	elif loc == GameManager.Location.AFTERGLOW:
+		# Transfer to warehouse
+		menu.add_item("转移到仓库", 3)
+
+	_finalize_context_menu(at_position)
+
+
+func _prepare_context_menu() -> PopupMenu:
+	if _context_menu != null and is_instance_valid(_context_menu):
+		_context_menu.queue_free()
+	_context_menu = PopupMenu.new()
+	_context_menu.name = "SlotContextMenu"
+	return _context_menu
+
+
+func _finalize_context_menu(at_position: Vector2) -> void:
+	_context_menu.id_pressed.connect(_on_context_menu_id_pressed)
+	add_child(_context_menu)
+	_context_menu.position = Vector2i(int(at_position.x), int(at_position.y))
+	_context_menu.popup()
+
+
+func _on_context_menu_id_pressed(id: int) -> void:
+	match id:
+		1:  # 使用 (expedition backpack)
+			if _inventory != null and _inventory.has_method("use_slot") and _context_slot_index >= 0:
+				_inventory.use_slot(_context_slot_index)
+		2:  # 丢弃 (expedition backpack)
+			if _inventory != null and _inventory.has_method("remove_slot_item") and _context_slot_index >= 0:
+				var removed: ItemDataResource = _inventory.remove_slot_item(_context_slot_index)
+				if removed != null:
+					_on_pickup_blocked("已丢弃: %s" % removed.item_name)
+		3:  # 转移到仓库 (afterglow backpack → warehouse)
+			if _context_slot_index >= 0:
+				transfer_backpack_slot_to_storage(_context_slot_index)
+		4:  # 转移到背包 (afterglow warehouse → backpack)
+			if _context_warehouse_name != "":
+				_transfer_warehouse_item(_context_warehouse_name)
+		5:  # 转移到背包 (expedition container → backpack)
+			if _context_container_index >= 0:
+				_transfer_container_entry(_context_container_index)
+	_context_slot_index = -1
+	_context_warehouse_name = ""
+	_context_container_index = -1
+	# Refresh whichever grids/lists are currently visible
+	var grid := _get_visible_backpack_grid()
+	if grid != null:
+		_populate_backpack_grid(grid)
+	if _storage_overlay != null and _storage_overlay.visible:
+		_populate_warehouse_list(_storage_overlay.get_node_or_null("WarehouseList") as VBoxContainer)
+	if _search_overlay != null and _search_overlay.visible:
+		_populate_container_list()
+
+
+func _get_item_type_name(type: int) -> String:
+	match type:
+		ItemDataResource.Type.COLLECTIBLE:
+			return "收藏品"
+		ItemDataResource.Type.AMMO:
+			return "弹药"
+		ItemDataResource.Type.BATTERY:
+			return "电池"
+		ItemDataResource.Type.PURIFIER:
+			return "净化剂"
+		_:
+			return "未知"
 
 
 func _populate_warehouse_list(list: VBoxContainer) -> void:
@@ -841,6 +984,8 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 		button.custom_minimum_size = Vector2(72.0, 30.0)
 		button.pressed.connect(Callable(self, "_transfer_warehouse_item").bind(String(item_name)))
 		row.add_child(button)
+		# Right-click context menu support
+		row_panel.gui_input.connect(_on_warehouse_row_gui_input.bind(String(item_name)))
 		list.add_child(row_panel)
 
 
@@ -885,6 +1030,9 @@ func _populate_container_list() -> void:
 		button.custom_minimum_size = Vector2(78.0, 30.0)
 		button.pressed.connect(Callable(self, "_transfer_container_entry").bind(i))
 		row.add_child(button)
+		# Right-click context menu support
+		if _can_transfer_container_entry(i):
+			row_panel.gui_input.connect(_on_container_row_gui_input.bind(i))
 		list.add_child(row_panel)
 	_save_search_snapshot()
 

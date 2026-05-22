@@ -21,7 +21,7 @@ mouse_filter = 2
 [node name="HPLabel" type="Label" parent="TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "HP  100 / 100"
+text = "生命  100 / 100"
 
 [node name="HPBar" type="ProgressBar" parent="TopLeft"]
 unique_name_in_owner = true
@@ -39,7 +39,7 @@ mouse_filter = 2
 [node name="ErosionLabel" type="Label" parent="TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Erosion  0%"
+text = "侵蚀  0%"
 
 [node name="ErosionBar" type="ProgressBar" parent="TopLeft"]
 unique_name_in_owner = true
@@ -57,7 +57,7 @@ mouse_filter = 2
 [node name="WeightLabel" type="Label" parent="TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Weight  0 / 50"
+text = "负重  0 / 50"
 
 [node name="TopRight" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -72,19 +72,19 @@ mouse_filter = 2
 [node name="AmmoLabel" type="Label" parent="TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Ammo  60 / 60"
+text = "弹药  60 / 60"
 horizontal_alignment = 2
 
 [node name="ScoreLabel" type="Label" parent="TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Score  0"
+text = "分数  0"
 horizontal_alignment = 2
 
 [node name="CollectibleLabel" type="Label" parent="TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Collectibles  0"
+text = "收集品  0"
 horizontal_alignment = 2
 
 [node name="BottomBar" type="HBoxContainer" parent="."]

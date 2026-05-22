@@ -164,7 +164,7 @@ no_depth_test = true
 render_priority = 10
 modulate = Color(0.88, 0.94, 0.9, 0.85)
 outline_modulate = Color(0.02, 0.03, 0.03, 0.7)
-text = "WASD Move  E Interact  B Backpack  Q Signal Flare"
+text = "WASD 移动  E 互动  B 背包  Q 撤离信号弹"
 font = SubResource("FontFile_plkho")
 font_size = 96
 outline_size = 6
@@ -175,7 +175,7 @@ no_depth_test = true
 render_priority = 10
 modulate = Color(1, 0.76, 0.35, 1)
 outline_modulate = Color(0.15, 0.08, 0.0, 0.6)
-text = "E  Storage"
+text = "E  仓库"
 font_size = 96
 outline_size = 6
 
@@ -185,7 +185,7 @@ no_depth_test = true
 render_priority = 10
 modulate = Color(0.58, 0.86, 1, 1)
 outline_modulate = Color(0.0, 0.08, 0.15, 0.6)
-text = "Hold E  Depart"
+text = "长按 E 出发"
 font_size = 96
 outline_size = 6
 
@@ -196,7 +196,7 @@ render_priority = 10
 pixel_size = 0.02
 modulate = Color(0.93, 0.88, 0.68, 1)
 outline_modulate = Color(0.1, 0.08, 0.04, 0.5)
-text = "AFTERGLOW EXPRESS"
+text = "余晖号"
 font_size = 128
 outline_size = 8
 
