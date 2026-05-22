@@ -1,6 +1,8 @@
 # item_pickup_3d.gd
+# 3D 可捡拾物品：放置于场景中的实体，玩家靠近触发自动拾取。
 # 3D ground pickup that hands items to the player's Inventory.
 # [AI-ASSISTED] 2026-05-19 - 3D pickup logic.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Area3D
 
 const ItemDataResource := preload("res://scripts/items/item_data.gd")

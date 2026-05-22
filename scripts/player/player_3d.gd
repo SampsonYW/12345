@@ -1,6 +1,7 @@
 # player_3d.gd
 # 3D 玩家控制：地面 XZ 平面移动、冲刺、鼠标射线瞄准、信号弹和背包快捷键。
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写玩家控制
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends CharacterBody3D
 
 @export var base_speed: float = 7.0

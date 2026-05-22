@@ -1,6 +1,7 @@
 # afterglow_map.gd
 # Self-contained Afterglow Express (母车) map script.
 # Owns: warehouse/departure interactions, collision management.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node3D
 
 const INTERACTION_RANGE := 3.25
@@ -69,13 +70,17 @@ func _update_interactions(delta: float) -> void:
 	_active_point = nearby
 	if nearby == "warehouse":
 		_departure_hold = 0.0
-		_set_prompt_text("E Open Storage")
+		_set_prompt_text("E 打开仓库")
 		if Input.is_action_pressed("interact") and not GameManager.ui_blocking_input:
 			if _hud != null and _hud.has_method("open_storage"):
 				_hud.open_storage()
 	elif nearby == "departure":
 		var departure_point := _get_point("departure")
-		var prompt_pos := departure_point.global_position + Vector3(0.0, 0.6, -2.5) if departure_point != null else Vector3(32.0, 0.8, 10.5)
+		var prompt_pos := (
+			departure_point.global_position + Vector3(0.0, 0.6, -2.5)
+			if departure_point != null
+			else Vector3(32.0, 0.8, 10.5)
+		)
 		if GameManager.ui_blocking_input:
 			_departure_hold = 0.0
 			_set_prompt_text("")
@@ -84,8 +89,8 @@ func _update_interactions(delta: float) -> void:
 		if Input.is_action_pressed("interact"):
 			_departure_hold += delta
 			var ratio := clampf(_departure_hold / DEPARTURE_HOLD_TIME, 0.0, 1.0)
-			_set_prompt_text("Hold E  Depart", prompt_pos)
-			_show_progress(ratio, "Departing  %d%%" % int(round(ratio * 100.0)))
+			_set_prompt_text("长按 E  出发", prompt_pos)
+			_show_progress(ratio, "出发中  %d%%" % int(round(ratio * 100.0)))
 			if ratio >= 1.0:
 				_hide_progress()
 				_begin_expedition()
@@ -101,11 +106,12 @@ func _update_interactions(delta: float) -> void:
 func _find_nearby_point() -> String:
 	if _player == null:
 		return ""
+	var p_pos := _player.global_position
 	var warehouse := _get_point("warehouse")
 	var departure := _get_point("departure")
-	if warehouse != null and _player.global_position.distance_to(warehouse.global_position) <= INTERACTION_RANGE:
+	if warehouse != null and p_pos.distance_to(warehouse.global_position) <= INTERACTION_RANGE:
 		return "warehouse"
-	if departure != null and _player.global_position.distance_to(departure.global_position) <= INTERACTION_RANGE:
+	if departure != null and p_pos.distance_to(departure.global_position) <= INTERACTION_RANGE:
 		return "departure"
 	return ""
 
@@ -155,7 +161,11 @@ func _set_prompt_text(text: String, world_position: Vector3 = Vector3.INF) -> vo
 	if _world_prompt.visible:
 		var target_pos := world_position
 		if target_pos == Vector3.INF:
-			target_pos = _player.global_position + Vector3(0.0, 0.0, 2.8) if _player != null else Vector3.ZERO
+			target_pos = (
+				_player.global_position + Vector3(0.0, 0.0, 2.8)
+				if _player != null
+				else Vector3.ZERO
+			)
 		var y := 0.09 if world_position == Vector3.INF else maxf(target_pos.y + 0.01, 0.09)
 		_world_prompt.global_position = Vector3(target_pos.x, y, target_pos.z)
 

@@ -1,6 +1,7 @@
 # game_3d.gd
 # 3D game root: thin orchestrator for maps, player, camera, and runtime systems.
 # Map-specific logic lives in afterglow_map.gd and expedition_map.gd.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node3D
 
 const PLAYER_SCENE := preload("res://scenes/player_3d.tscn")
@@ -107,7 +108,7 @@ func get_player_zone_info() -> Dictionary:
 func get_player_risk_label() -> String:
 	if _expedition_map != null and _expedition_map.has_method("get_player_risk_label"):
 		return _expedition_map.get_player_risk_label()
-	return "Low Risk"
+	return "低风险"
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +202,7 @@ func _apply_location(location: int) -> void:
 		if _player != null:
 			_player.global_position = Vector3(0.0, 0.0, 5.0)
 			GameManager.player_position = _player.global_position
-		_set_risk_label_text("Afterglow Express")
+		_set_risk_label_text("余晖号")
 	elif expedition_active and _expedition_map != null and _expedition_map.has_method("activate"):
 		_expedition_map.activate(_player, _hud, _world_prompt)
 		if _player != null:
@@ -210,7 +211,7 @@ func _apply_location(location: int) -> void:
 	else:
 		# Title state
 		_clear_children(_enemies)
-		_set_risk_label_text("Title")
+		_set_risk_label_text("标题")
 
 	# Expedition-only entities & systems
 	_enemies.visible = expedition_active
@@ -222,7 +223,10 @@ func _apply_location(location: int) -> void:
 
 	if _fog_of_war != null:
 		_fog_of_war.visible = expedition_active
-		_fog_of_war.process_mode = Node.PROCESS_MODE_INHERIT if expedition_active else Node.PROCESS_MODE_DISABLED
+		_fog_of_war.process_mode = (
+			Node.PROCESS_MODE_INHERIT if expedition_active
+			else Node.PROCESS_MODE_DISABLED
+		)
 
 	if location == GameManager.Location.AFTERGLOW:
 		_clear_children(_enemies)
@@ -257,7 +261,11 @@ func _set_prompt_text(text: String) -> void:
 	_world_prompt.text = text
 	_world_prompt.visible = text.strip_edges() != ""
 	if _world_prompt.visible:
-		var target_position := _player.global_position + Vector3(0.0, 0.0, 2.8) if _player != null else Vector3.ZERO
+		var target_position := (
+			_player.global_position + Vector3(0.0, 0.0, 2.8)
+			if _player != null
+			else Vector3.ZERO
+		)
 		_world_prompt.global_position = Vector3(target_position.x, 0.09, target_position.z)
 
 

@@ -2,7 +2,11 @@
 # Time and erosion driven enemy pressure for the 3D MVP run loop.
 # [AI-ASSISTED] 2026-05-20 - Day 4 P0 spawn pressure.
 # [AI-ASSISTED] 2026-05-21 - Fix enemies spawning on obstacles.
+# [AI-ASSISTED] 2026-05-22 - Add spawn_occurred signal for HUD pulse (polish_plan §4)
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node3D
+
+signal spawn_occurred(position: Vector3, kind: String)
 
 const DEFAULT_SPAWN_POINTS := [
 	Vector3(-270.0, 0.0, -140.0),
@@ -56,7 +60,8 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if GameManager.current_state != GameManager.State.RUNNING and GameManager.current_state != GameManager.State.EXTRACTING:
+	var state := GameManager.current_state
+	if state != GameManager.State.RUNNING and state != GameManager.State.EXTRACTING:
 		return
 	var spm := get_current_spawns_per_minute()
 	if spm <= 0.0:
@@ -123,7 +128,11 @@ func spawn_enemy(elapsed: float, tier: int) -> Node3D:
 	var spawn_dormant := elapsed > 60.0 and randf() < _get_dormant_ratio(tier)
 	var scene := _dormant_scene if spawn_dormant else _patrol_scene
 	var point := get_farthest_spawn_point()
-	return _spawn_fixed(scene, point, tier)
+	var enemy := _spawn_fixed(scene, point, tier)
+	if enemy != null:
+		var kind := "dormant" if spawn_dormant else "patrol"
+		spawn_occurred.emit(point, kind)
+	return enemy
 
 
 func on_signal_flare() -> void:
@@ -218,7 +227,8 @@ func _get_ranked_spawn_points() -> Array[Vector3]:
 	valid.sort_custom(func(a: Vector3, b: Vector3) -> bool:
 		var a_visible_distance := a.distance_to(_visible_avoidance_center)
 		var b_visible_distance := b.distance_to(_visible_avoidance_center)
-		if _visible_avoidance_radius > 0.0 and not is_equal_approx(a_visible_distance, b_visible_distance):
+		var is_approx := is_equal_approx(a_visible_distance, b_visible_distance)
+		if _visible_avoidance_radius > 0.0 and not is_approx:
 			return a_visible_distance > b_visible_distance
 		return a.distance_to(GameManager.player_position) > b.distance_to(GameManager.player_position)
 	)

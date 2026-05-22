@@ -1,6 +1,7 @@
 # enemy_3d.gd
 # 3D 敌人基类：巡逻型主动游走追击，休眠型靠噪音/受击唤醒，近身攻击 PlayerHealth。
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写敌人占位逻辑
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends CharacterBody3D
 
 signal died(enemy: CharacterBody3D)
@@ -405,16 +406,28 @@ func _ensure_alert_bar_meshes() -> void:
 	if back == null:
 		back = MeshInstance3D.new()
 		back.name = "AlertBack"
-		back.mesh = _make_alert_box_mesh(Vector3(ALERT_BAR_WIDTH, ALERT_BAR_HEIGHT, ALERT_BAR_DEPTH))
-		back.material_override = _make_alert_material(Color(0.04, 0.05, 0.05, 0.9), Color(0.0, 0.0, 0.0, 1.0), 0.0)
+		back.mesh = _make_alert_box_mesh(
+			Vector3(ALERT_BAR_WIDTH, ALERT_BAR_HEIGHT, ALERT_BAR_DEPTH)
+		)
+		back.material_override = _make_alert_material(
+			Color(0.04, 0.05, 0.05, 0.9),
+			Color(0.0, 0.0, 0.0, 1.0),
+			0.0
+		)
 		_alert_bar.add_child(back)
 
 	_alert_bar_fill = _alert_bar.get_node_or_null("AlertFill") as MeshInstance3D
 	if _alert_bar_fill == null:
 		_alert_bar_fill = MeshInstance3D.new()
 		_alert_bar_fill.name = "AlertFill"
-		_alert_bar_fill.mesh = _make_alert_box_mesh(Vector3(ALERT_BAR_WIDTH, ALERT_BAR_HEIGHT * 0.65, ALERT_BAR_DEPTH * 1.2))
-		_alert_bar_fill.material_override = _make_alert_material(Color(1.0, 0.65, 0.12, 1.0), Color(1.0, 0.35, 0.05, 1.0), 0.8)
+		_alert_bar_fill.mesh = _make_alert_box_mesh(
+			Vector3(ALERT_BAR_WIDTH, ALERT_BAR_HEIGHT * 0.65, ALERT_BAR_DEPTH * 1.2)
+		)
+		_alert_bar_fill.material_override = _make_alert_material(
+			Color(1.0, 0.65, 0.12, 1.0),
+			Color(1.0, 0.35, 0.05, 1.0),
+			0.8
+		)
 		_alert_bar_fill.position.z = -0.01
 		_alert_bar.add_child(_alert_bar_fill)
 
@@ -424,16 +437,28 @@ func _ensure_hp_bar_meshes() -> void:
 	if back == null:
 		back = MeshInstance3D.new()
 		back.name = "HpBack"
-		back.mesh = _make_alert_box_mesh(Vector3(HP_BAR_WIDTH, HP_BAR_HEIGHT, HP_BAR_DEPTH))
-		back.material_override = _make_alert_material(Color(0.04, 0.04, 0.04, 0.9), Color(0.0, 0.0, 0.0, 1.0), 0.0)
+		back.mesh = _make_alert_box_mesh(
+			Vector3(HP_BAR_WIDTH, HP_BAR_HEIGHT, HP_BAR_DEPTH)
+		)
+		back.material_override = _make_alert_material(
+			Color(0.04, 0.04, 0.04, 0.9),
+			Color(0.0, 0.0, 0.0, 1.0),
+			0.0
+		)
 		_hp_bar.add_child(back)
 
 	_hp_bar_fill = _hp_bar.get_node_or_null("HpFill") as MeshInstance3D
 	if _hp_bar_fill == null:
 		_hp_bar_fill = MeshInstance3D.new()
 		_hp_bar_fill.name = "HpFill"
-		_hp_bar_fill.mesh = _make_alert_box_mesh(Vector3(HP_BAR_WIDTH, HP_BAR_HEIGHT * 0.65, HP_BAR_DEPTH * 1.2))
-		_hp_bar_fill.material_override = _make_alert_material(Color(0.95, 0.08, 0.05, 1.0), Color(1.0, 0.04, 0.02, 1.0), 0.65)
+		_hp_bar_fill.mesh = _make_alert_box_mesh(
+			Vector3(HP_BAR_WIDTH, HP_BAR_HEIGHT * 0.65, HP_BAR_DEPTH * 1.2)
+		)
+		_hp_bar_fill.material_override = _make_alert_material(
+			Color(0.95, 0.08, 0.05, 1.0),
+			Color(1.0, 0.04, 0.02, 1.0),
+			0.65
+		)
 		_hp_bar_fill.position.z = -0.01
 		_hp_bar.add_child(_hp_bar_fill)
 
@@ -444,7 +469,11 @@ func _make_alert_box_mesh(size: Vector3) -> BoxMesh:
 	return mesh
 
 
-func _make_alert_material(albedo: Color, emission: Color, emission_energy: float) -> StandardMaterial3D:
+func _make_alert_material(
+	albedo: Color,
+	emission: Color,
+	emission_energy: float
+) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = albedo
 	material.emission_enabled = emission_energy > 0.0

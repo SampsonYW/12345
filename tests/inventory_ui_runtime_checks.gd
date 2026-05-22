@@ -102,7 +102,7 @@ func _run() -> void:
 	if hud.has_method("get_visible_backpack_item_names"):
 		_expect(hud.get_visible_backpack_item_names().size() > 0, "Backpack item names exist only inside overlay")
 	if hud.has_method("transfer_storage_item_to_backpack") and hud.has_method("transfer_backpack_slot_to_storage"):
-		var moved_to_backpack: bool = hud.transfer_storage_item_to_backpack("Small Battery")
+		var moved_to_backpack: bool = hud.transfer_storage_item_to_backpack("能量电池")
 		_expect(moved_to_backpack, "Warehouse item can move into backpack through shared transfer API")
 		var moved_back: bool = hud.transfer_backpack_slot_to_storage(0)
 		_expect(moved_back, "Backpack item can move back into warehouse")

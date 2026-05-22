@@ -1,6 +1,8 @@
 # container_3d.gd
+# 3D 容器节点：管理破解时间、被发现概率、随机物品掉落和开启状态。
 # 3D 密封容器：玩家进入范围后长按 interact 破解，完成后生成 3D 拾取物。
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写容器交互
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends StaticBody3D
 
 signal cracked(container: StaticBody3D)

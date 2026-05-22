@@ -1,6 +1,8 @@
 # minimap.gd
+# 小地图 UI 组件：显示玩家位置、高风险区边界及被唤醒的敌人红点警示。
 # 2D HUD minimap for expedition bounds, obstacles, spawn points, and player heading.
 # [AI-ASSISTED] 2026-05-22 - Based on docs/polish_plan.md Plan 2.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 class_name Minimap
 extends Control
 

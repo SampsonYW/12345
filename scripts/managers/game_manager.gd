@@ -1,5 +1,6 @@
 # game_manager.gd
 # Autoload singleton for run state, erosion, elapsed time, and signal flare state.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node
 
 signal state_changed(new_state: State)

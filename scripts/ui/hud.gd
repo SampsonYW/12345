@@ -1,3 +1,6 @@
+# hud.gd
+# HUD UI 逻辑脚本：管理玩家状态条（HP、侵蚀、弹药）、背包拖拽、容器搜索和母车仓库，以及屏幕边缘敌人警示 wedges。
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Control
 
 const EMPTY_SLOT_COLOR := Color(0.12, 0.12, 0.12, 0.72)
@@ -10,6 +13,21 @@ const ITEM_BATTERY := preload("res://resources/items/battery_small.tres")
 const ITEM_PURIFIER := preload("res://resources/items/purifier.tres")
 const STORAGE_DRAG_SLOT_SCRIPT := preload("res://scripts/ui/storage_drag_slot.gd")
 const MINIMAP_SCRIPT := preload("res://scripts/ui/minimap.gd")
+
+# ----- Alert indicator constants (polish_plan §3) -----
+const ALERT_INDICATOR_SIZE := 32.0
+const ALERT_PULSE_SPEED := 4.0
+const ALERT_MAX_OPACITY := 0.9
+const ALERT_DETECTION_RANGE := 25.0
+const ALERT_EDGE_INSET := 8.0
+const ALERT_MERGE_ANGLE_DEG := 15.0
+
+# ----- Spawn pulse constants (polish_plan §4) -----
+const SPAWN_PULSE_SIZE := 48.0
+const SPAWN_PULSE_DURATION := 2.0
+const SPAWN_PULSE_ENTER_TIME := 0.2
+const SPAWN_PULSE_HOLD_TIME := 1.5
+const SPAWN_PULSE_FADE_TIME := 0.3
 
 const TYPE_COLORS := {
 	ItemDataResource.Type.COLLECTIBLE: Color(0.95, 0.68, 0.25, 1.0),
@@ -51,18 +69,21 @@ var _minimap: Control = null
 var _hold_progress_container: Control = null
 var _hold_progress_fill: ColorRect = null
 var _hold_progress_label: Label = null
+var _spawn_manager: Node = null
+var _alert_indicators: Array[Dictionary] = []  # [{screen_pos, opacity, direction}]
+var _spawn_pulses: Array[Dictionary] = []  # [{screen_pos, remaining, max_time, direction}]
 var _warehouse_stock := {
-	"Standard Ammo": 12,
-	"Small Battery": 6,
-	"Purifier": 2,
-	"Small Relic": 1,
+	"标准弹药": 12,
+	"能量电池": 6,
+	"净化剂": 2,
+	"残响碎片": 1,
 }
-var _warehouse_order := ["Standard Ammo", "Small Battery", "Purifier", "Small Relic"]
+var _warehouse_order := ["标准弹药", "能量电池", "净化剂", "残响碎片"]
 var _warehouse_items := {
-	"Standard Ammo": ITEM_AMMO,
-	"Small Battery": ITEM_BATTERY,
-	"Purifier": ITEM_PURIFIER,
-	"Small Relic": ITEM_RELIC,
+	"标准弹药": ITEM_AMMO,
+	"能量电池": ITEM_BATTERY,
+	"净化剂": ITEM_PURIFIER,
+	"残响碎片": ITEM_RELIC,
 }
 
 @onready var top_left: VBoxContainer = $TopLeft
@@ -108,6 +129,7 @@ func _process(delta: float) -> void:
 		_bind_player_refs()
 	if _extraction == null:
 		_bind_extraction_ref()
+	_bind_spawn_manager_ref()
 	if _blocked_hide_timer > 0.0:
 		_blocked_hide_timer -= delta
 		if _blocked_hide_timer <= 0.0:
@@ -115,6 +137,9 @@ func _process(delta: float) -> void:
 	_process_container_search(delta)
 	_update_time_label()
 	_update_signal_label()
+	_update_alert_indicators(delta)
+	_update_spawn_pulses(delta)
+	queue_redraw()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -165,10 +190,10 @@ func _mark_input_as_handled() -> void:
 
 
 func _build_status_labels() -> void:
-	_state_label = _make_status_label("State  Preparing")
-	_time_label = _make_status_label("Time  00:00")
-	_signal_label = _make_status_label("Signal  Ready")
-	_risk_label = _make_status_label("Risk  Title")
+	_state_label = _make_status_label("状态  准备中")
+	_time_label = _make_status_label("时间  00:00")
+	_signal_label = _make_status_label("信号  就绪")
+	_risk_label = _make_status_label("风险  标题")
 	top_right.add_child(_state_label)
 	top_right.add_child(_time_label)
 	top_right.add_child(_signal_label)
@@ -353,14 +378,14 @@ func _build_main_overlay() -> void:
 	_main_overlay.add_child(content)
 
 	var title := Label.new()
-	title.text = "Afterglow Express"
+	title.text = "余晖号"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 42)
 	title.add_theme_color_override("font_color", Color(0.96, 0.92, 0.78, 1.0))
 	content.add_child(title)
 
 	_main_prompt_label = Label.new()
-	_main_prompt_label.text = "Click anywhere to start"
+	_main_prompt_label.text = "点击任意位置开始"
 	_main_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_main_prompt_label.add_theme_font_size_override("font_size", 18)
 	_main_prompt_label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.82, 1.0))
@@ -374,7 +399,7 @@ func _build_main_overlay() -> void:
 	content.add_child(_main_summary_label)
 
 	var button := Button.new()
-	button.text = "Start"
+	button.text = "开始"
 	button.custom_minimum_size = Vector2(180.0, 42.0)
 	button.pressed.connect(_on_title_clicked)
 	content.add_child(button)
@@ -412,13 +437,13 @@ func _build_result_overlay() -> void:
 	content.add_child(_result_stats_label)
 
 	var prompt := Label.new()
-	prompt.text = "Press Enter or Space to return to Afterglow"
+	prompt.text = "按回车或空格返回余晖号"
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	prompt.add_theme_color_override("font_color", Color(0.76, 0.84, 0.80, 1.0))
 	content.add_child(prompt)
 
 	var button := Button.new()
-	button.text = "Back to Afterglow"
+	button.text = "返回余晖号"
 	button.custom_minimum_size = Vector2(180.0, 42.0)
 	button.pressed.connect(_return_to_home_from_result)
 	content.add_child(button)
@@ -594,14 +619,14 @@ func _build_backpack_overlay() -> Control:
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
 	panel.add_child(content)
-	content.add_child(_make_overlay_title("Backpack"))
+	content.add_child(_make_overlay_title("背包"))
 	var grid := _make_backpack_grid()
 	content.add_child(grid)
 	var direct_grid := _make_backpack_grid()
 	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_position_overlay_child(direct_grid, Vector2(-180.0, -130.0), Vector2(180.0, 90.0))
 	overlay.add_child(direct_grid)
-	content.add_child(_make_hint_label("Esc or B closes. Quick-use keys still work after closing."))
+	content.add_child(_make_hint_label("按 Esc 或 B 关闭。关闭后快捷键仍可使用。"))
 	return overlay
 
 
@@ -616,7 +641,7 @@ func _build_storage_overlay() -> Control:
 	left.custom_minimum_size = Vector2(390.0, 0.0)
 	left.add_theme_constant_override("separation", 12)
 	columns.add_child(left)
-	left.add_child(_make_overlay_title("Backpack"))
+	left.add_child(_make_overlay_title("背包"))
 	left.add_child(_make_backpack_grid())
 	var direct_grid := _make_backpack_grid()
 	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -627,7 +652,7 @@ func _build_storage_overlay() -> Control:
 	right.custom_minimum_size = Vector2(360.0, 0.0)
 	right.add_theme_constant_override("separation", 10)
 	columns.add_child(right)
-	right.add_child(_make_overlay_title("Warehouse"))
+	right.add_child(_make_overlay_title("仓库"))
 	var list := VBoxContainer.new()
 	list.name = "WarehouseList"
 	list.add_theme_constant_override("separation", 6)
@@ -638,7 +663,9 @@ func _build_storage_overlay() -> Control:
 	direct_list.add_theme_constant_override("separation", 6)
 	_position_overlay_child(direct_list, Vector2(40.0, -160.0), Vector2(390.0, 120.0))
 	overlay.add_child(direct_list)
-	right.add_child(_make_hint_label("Rows show storage stock. Transfer buttons share the same inventory API."))
+	right.add_child(_make_hint_label(
+		"行显示库存。转移按钮共享相同的物品操作接口。"
+	))
 	return overlay
 
 
@@ -653,7 +680,7 @@ func _build_search_overlay() -> Control:
 	left.custom_minimum_size = Vector2(390.0, 0.0)
 	left.add_theme_constant_override("separation", 12)
 	columns.add_child(left)
-	left.add_child(_make_overlay_title("Backpack"))
+	left.add_child(_make_overlay_title("背包"))
 	left.add_child(_make_backpack_grid())
 	var direct_grid := _make_backpack_grid()
 	direct_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -664,7 +691,7 @@ func _build_search_overlay() -> Control:
 	right.custom_minimum_size = Vector2(430.0, 0.0)
 	right.add_theme_constant_override("separation", 10)
 	columns.add_child(right)
-	right.add_child(_make_overlay_title("Container"))
+	right.add_child(_make_overlay_title("容器"))
 	var list := VBoxContainer.new()
 	list.name = "ContainerList"
 	list.add_theme_constant_override("separation", 6)
@@ -678,7 +705,9 @@ func _build_search_overlay() -> Control:
 	_search_feedback_label = _make_hint_label("")
 	_search_feedback_label.name = "SearchFeedback"
 	right.add_child(_search_feedback_label)
-	right.add_child(_make_hint_label("Search starts automatically. Move revealed items into the backpack explicitly."))
+	right.add_child(_make_hint_label(
+		"搜索自动开始。请将发现的物品移入背包。"
+	))
 	return overlay
 
 
@@ -702,7 +731,11 @@ func _make_overlay(node_name: String, size: Vector2) -> Control:
 	return overlay
 
 
-func _position_overlay_child(control: Control, top_left_offset: Vector2, bottom_right_offset: Vector2) -> void:
+func _position_overlay_child(
+	control: Control,
+	top_left_offset: Vector2,
+	bottom_right_offset: Vector2
+) -> void:
 	control.set_anchors_preset(Control.PRESET_CENTER)
 	control.offset_left = top_left_offset.x
 	control.offset_top = top_left_offset.y
@@ -759,7 +792,7 @@ func _populate_backpack_grid(grid: GridContainer) -> void:
 		title.add_theme_font_size_override("font_size", 13)
 		title.add_theme_color_override("font_color", Color(0.92, 0.96, 0.90, 1.0))
 		var item: ItemDataResource = slots[i] if i < slots.size() else null
-		title.text = item.item_name if item != null else "Empty"
+		title.text = item.item_name if item != null else ""
 		if item != null:
 			slot.set("drag_payload", {
 				"source": "backpack",
@@ -769,7 +802,7 @@ func _populate_backpack_grid(grid: GridContainer) -> void:
 		box.add_child(title)
 
 		var detail := Label.new()
-		detail.text = "Slot %d" % (i + 1)
+		detail.text = "栏位 %d" % (i + 1)
 		detail.add_theme_font_size_override("font_size", 11)
 		detail.add_theme_color_override("font_color", Color(0.62, 0.70, 0.66, 1.0))
 		box.add_child(detail)
@@ -803,7 +836,7 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(label)
 		var button := Button.new()
-		button.text = "Move"
+		button.text = "转移"
 		button.disabled = int(_warehouse_stock.get(item_name, 0)) <= 0
 		button.custom_minimum_size = Vector2(72.0, 30.0)
 		button.pressed.connect(Callable(self, "_transfer_warehouse_item").bind(String(item_name)))
@@ -847,7 +880,7 @@ func _populate_container_list() -> void:
 		label.text = "%d  %s" % [i + 1, _get_container_entry_label(i)]
 		row.add_child(label)
 		var button := Button.new()
-		button.text = "Move"
+		button.text = "转移"
 		button.disabled = not _can_transfer_container_entry(i)
 		button.custom_minimum_size = Vector2(78.0, 30.0)
 		button.pressed.connect(Callable(self, "_transfer_container_entry").bind(i))
@@ -858,24 +891,26 @@ func _populate_container_list() -> void:
 
 func _get_container_entry_label(index: int) -> String:
 	if _search_container == null:
-		return "Unknown"
-	if _search_container.has_method("is_entry_transferred") and _search_container.is_entry_transferred(index):
-		return "Transferred"
-	if _search_container.has_method("is_entry_revealed") and _search_container.is_entry_revealed(index):
-		if _search_container.has_method("get_revealed_item_name"):
-			return _search_container.get_revealed_item_name(index)
-		return "Revealed Item"
-	if index == _search_active_index and _search_container.has_method("get_search_progress_ratio"):
-		return "Searching... %d%%" % int(round(_search_container.get_search_progress_ratio(index) * 100.0))
+		return "未知"
+	var container := _search_container
+	if container.has_method("is_entry_transferred") and container.is_entry_transferred(index):
+		return "已转移"
+	if container.has_method("is_entry_revealed") and container.is_entry_revealed(index):
+		if container.has_method("get_revealed_item_name"):
+			return container.get_revealed_item_name(index)
+		return "已发现物品"
+	if index == _search_active_index and container.has_method("get_search_progress_ratio"):
+		return "搜索中... %d%%" % int(round(container.get_search_progress_ratio(index) * 100.0))
 	return "Unknown"
 
 
 func _can_transfer_container_entry(index: int) -> bool:
 	if _search_container == null:
 		return false
-	if _search_container.has_method("is_entry_transferred") and _search_container.is_entry_transferred(index):
+	var container := _search_container
+	if container.has_method("is_entry_transferred") and container.is_entry_transferred(index):
 		return false
-	return _search_container.has_method("is_entry_revealed") and _search_container.is_entry_revealed(index)
+	return container.has_method("is_entry_revealed") and container.is_entry_revealed(index)
 
 
 func _transfer_container_entry(index: int) -> bool:
@@ -885,9 +920,9 @@ func _transfer_container_entry(index: int) -> bool:
 	if _inventory.has_method("transfer_revealed_item_from_container"):
 		moved = _inventory.transfer_revealed_item_from_container(_search_container, index)
 	if moved:
-		_set_search_feedback("Moved to backpack.")
+		_set_search_feedback("已移至背包。")
 	else:
-		_set_search_feedback("Cannot move item.")
+		_set_search_feedback("无法转移物品。")
 	_populate_backpack_grid(_search_overlay.get_node_or_null("BackpackGrid") as GridContainer)
 	_populate_container_list()
 	return moved
@@ -900,7 +935,9 @@ func transfer_storage_item_to_backpack(item_name: String) -> bool:
 func transfer_backpack_slot_to_storage(slot_index: int) -> bool:
 	if _inventory == null or not _inventory.has_method("remove_slot_item"):
 		return false
-	var item: ItemDataResource = _inventory.get_slot_item(slot_index) if _inventory.has_method("get_slot_item") else null
+	var item: ItemDataResource = null
+	if _inventory.has_method("get_slot_item"):
+		item = _inventory.get_slot_item(slot_index)
 	if item == null:
 		return false
 	var removed: ItemDataResource = _inventory.remove_slot_item(slot_index)
@@ -945,7 +982,7 @@ func _transfer_warehouse_item(item_name: String) -> bool:
 		return false
 	var stock := int(_warehouse_stock.get(item_name, 0))
 	if stock <= 0:
-		_on_pickup_blocked("Warehouse item depleted.")
+		_on_pickup_blocked("仓库物品已耗尽。")
 		return false
 	var item: ItemDataResource = _warehouse_items.get(item_name, null)
 	if item == null:
@@ -994,13 +1031,16 @@ func _process_container_search(delta: float) -> void:
 		return
 	if _search_container == null or not is_instance_valid(_search_container):
 		return
-	if not _search_container.has_method("get_search_entry_count") or not _search_container.has_method("search_entry"):
+	var container := _search_container
+	var has_count := container.has_method("get_search_entry_count")
+	var has_search := container.has_method("search_entry")
+	if not has_count or not has_search:
 		return
-	var count: int = _search_container.get_search_entry_count()
+	var count: int = container.get_search_entry_count()
 	if _search_active_index < 0 or _entry_search_complete(_search_active_index):
 		_search_active_index = _find_next_unsearched_entry(count)
 	if _search_active_index >= 0:
-		_search_container.search_entry(_search_active_index, delta)
+		container.search_entry(_search_active_index, delta)
 	# Only rebuild the list when structural state changes (entry revealed/transferred).
 	# This prevents destroying buttons/drag-slots every frame, which was blocking
 	# mouse clicks and drag-and-drop interactions.
@@ -1019,7 +1059,9 @@ func _handle_overlay_shortcut(event: InputEventKey) -> bool:
 	if _search_overlay != null and _search_overlay.visible:
 		_transfer_container_entry(shortcut_index)
 		return true
-	if _storage_overlay != null and _storage_overlay.visible and shortcut_index < _warehouse_order.size():
+	if (_storage_overlay != null
+			and _storage_overlay.visible
+			and shortcut_index < _warehouse_order.size()):
 		_transfer_warehouse_item(_warehouse_order[shortcut_index])
 		return true
 	return false
@@ -1028,18 +1070,20 @@ func _handle_overlay_shortcut(event: InputEventKey) -> bool:
 func _entry_search_complete(index: int) -> bool:
 	if _search_container == null:
 		return true
-	if _search_container.has_method("is_entry_revealed") and _search_container.is_entry_revealed(index):
+	var container := _search_container
+	if container.has_method("is_entry_revealed") and container.is_entry_revealed(index):
 		return true
-	if _search_container.has_method("is_entry_transferred") and _search_container.is_entry_transferred(index):
+	if container.has_method("is_entry_transferred") and container.is_entry_transferred(index):
 		return true
 	return false
 
 
 func _find_next_unsearched_entry(count: int) -> int:
+	var container := _search_container
 	for i in count:
-		if _search_container.has_method("is_entry_revealed") and _search_container.is_entry_revealed(i):
+		if container.has_method("is_entry_revealed") and container.is_entry_revealed(i):
 			continue
-		if _search_container.has_method("is_entry_transferred") and _search_container.is_entry_transferred(i):
+		if container.has_method("is_entry_transferred") and container.is_entry_transferred(i):
 			continue
 		return i
 	return -1
@@ -1114,7 +1158,8 @@ func _set_run_hud_visible(show: bool) -> void:
 	if _prompt_label != null:
 		_prompt_label.visible = false
 	if _minimap != null:
-		_minimap.visible = show and GameManager.current_location == GameManager.Location.EXPEDITION
+		var is_expedition := GameManager.current_location == GameManager.Location.EXPEDITION
+		_minimap.visible = show and is_expedition
 	blocked_label.visible = show and blocked_label.visible
 
 
@@ -1125,7 +1170,8 @@ func _on_title_clicked() -> void:
 
 
 func _start_run_from_ui() -> void:
-	if GameManager.current_state == GameManager.State.SUCCESS or GameManager.current_state == GameManager.State.DEAD:
+	var state := GameManager.current_state
+	if state == GameManager.State.SUCCESS or state == GameManager.State.DEAD:
 		GameManager.request_start_after_reload()
 		get_tree().reload_current_scene()
 		return
@@ -1149,25 +1195,25 @@ func _on_main_overlay_gui_input(event: InputEvent) -> void:
 func _on_health_changed(current: float, maximum: float) -> void:
 	var safe_maximum := maxf(maximum, 1.0)
 	hp_bar.value = current / safe_maximum * 100.0
-	hp_label.text = "HP  %d / %d" % [int(round(current)), int(round(maximum))]
+	hp_label.text = "生命  %d / %d" % [int(round(current)), int(round(maximum))]
 
 
 func _on_erosion_changed(value: float) -> void:
 	erosion_bar.value = value
-	erosion_label.text = "Erosion  %d%%" % int(round(value))
+	erosion_label.text = "侵蚀  %d%%" % int(round(value))
 
 
 func _on_ammo_changed(current: int, max_value: int) -> void:
-	ammo_label.text = "Ammo  %d / %d" % [current, max_value]
+	ammo_label.text = "弹药  %d / %d" % [current, max_value]
 
 
 func _on_collectible_changed(count: int, score: int) -> void:
-	collectible_label.text = "Collectibles  %d" % count
-	score_label.text = "Score  %d" % score
+	collectible_label.text = "收集品  %d" % count
+	score_label.text = "分数  %d" % score
 
 
 func _on_inventory_changed(slots: Array, current_weight: float, max_weight: float) -> void:
-	weight_label.text = "Weight  %d / %d" % [int(round(current_weight)), int(round(max_weight))]
+	weight_label.text = "负重  %d / %d" % [int(round(current_weight)), int(round(max_weight))]
 	if _active_blocking_overlay != null:
 		_populate_backpack_grid(_get_visible_backpack_grid())
 	for i in _slot_panels.size():
@@ -1193,7 +1239,7 @@ func _on_pickup_blocked(reason: String) -> void:
 
 func _on_state_changed(new_state: int) -> void:
 	if _state_label != null:
-		_state_label.text = "State  %s" % _get_state_text(new_state)
+		_state_label.text = "状态  %s" % _get_state_text(new_state)
 	_update_signal_label()
 	_update_end_flow(new_state)
 	if new_state == GameManager.State.RUNNING or new_state == GameManager.State.EXTRACTING:
@@ -1202,26 +1248,26 @@ func _on_state_changed(new_state: int) -> void:
 
 func _on_signal_flare_fired(_origin: Vector3) -> void:
 	_update_signal_label()
-	blocked_label.text = "Signal fired. Hold the extraction zone."
+	blocked_label.text = "信号已发射。守住撤离区域。"
 	blocked_label.visible = true
 	_blocked_hide_timer = 2.0
 
 
 func _on_location_changed(location: int) -> void:
 	if location == GameManager.Location.TITLE:
-		set_risk_label_text("Risk  Title")
+		set_risk_label_text("风险  标题")
 		if _zone_container != null:
 			_zone_container.visible = false
 		if _minimap != null:
 			_minimap.visible = false
 	elif location == GameManager.Location.AFTERGLOW:
-		set_risk_label_text("Afterglow Express")
+		set_risk_label_text("余晖号")
 		if _zone_container != null:
 			_zone_container.visible = false
 		if _minimap != null:
 			_minimap.visible = false
 	elif location == GameManager.Location.EXPEDITION:
-		set_risk_label_text("Risk  Low Risk")
+		set_risk_label_text("风险  低风险")
 		if _zone_container != null:
 			_zone_container.visible = true
 		if _minimap != null:
@@ -1234,19 +1280,19 @@ func _update_time_label() -> void:
 	var total_seconds: int = int(floor(GameManager.elapsed_time))
 	var minutes: int = floori(float(total_seconds) / 60.0)
 	var seconds: int = total_seconds % 60
-	_time_label.text = "Time  %02d:%02d" % [minutes, seconds]
+	_time_label.text = "时间  %02d:%02d" % [minutes, seconds]
 
 
 func _update_signal_label() -> void:
 	if _signal_label == null:
 		return
 	if not GameManager.signal_flare_used:
-		_signal_label.text = "Signal  Ready"
+		_signal_label.text = "信号  就绪"
 		return
 	if _extraction != null and _extraction.has_method("get_status_text"):
-		_signal_label.text = "Signal  %s" % _extraction.get_status_text()
+		_signal_label.text = "信号  %s" % _extraction.get_status_text()
 	else:
-		_signal_label.text = "Signal  Fired"
+		_signal_label.text = "信号  已发射"
 
 
 func _update_end_flow(state: int) -> void:
@@ -1257,8 +1303,8 @@ func _update_end_flow(state: int) -> void:
 
 	var success := state == GameManager.State.SUCCESS
 	var score := _get_run_score() if success else 0
-	_result_title_label.text = "Extraction Complete" if success else "Run Failed"
-	_result_stats_label.text = "Score  %d\nKills  %d\nErosion  %d%%\nTime  %s" % [
+	_result_title_label.text = "撤离成功" if success else "行动失败"
+	_result_stats_label.text = "分数  %d\n击杀  %d\n侵蚀  %d%%\n时间  %s" % [
 		score,
 		GameManager.kill_count,
 		int(round(GameManager.player_erosion)),
@@ -1273,15 +1319,15 @@ func _update_end_flow(state: int) -> void:
 
 func _set_main_summary(title: String, stats: String) -> void:
 	if _main_prompt_label != null:
-		_main_prompt_label.text = "Last run: %s" % title
+		_main_prompt_label.text = "上次行动: %s" % title
 	if _main_summary_label != null:
-		_main_summary_label.text = "%s\n\nPress Enter, Space, or Start Run for a new run." % stats
+		_main_summary_label.text = "%s\n\n按回车、空格或点击开始进行新一轮行动。" % stats
 		_main_summary_label.visible = true
 
 
 func _clear_main_summary() -> void:
 	if _main_prompt_label != null:
-		_main_prompt_label.text = "Click anywhere to start"
+		_main_prompt_label.text = "点击任意位置开始"
 	if _main_summary_label != null:
 		_main_summary_label.text = ""
 		_main_summary_label.visible = false
@@ -1303,14 +1349,199 @@ func _format_elapsed_time() -> String:
 func _get_state_text(state: int) -> String:
 	match state:
 		GameManager.State.PREPARING:
-			return "Preparing"
+			return "准备中"
 		GameManager.State.RUNNING:
-			return "Running"
+			return "行动中"
 		GameManager.State.EXTRACTING:
-			return "Extracting"
+			return "撤离中"
 		GameManager.State.SUCCESS:
-			return "Success"
+			return "成功"
 		GameManager.State.DEAD:
-			return "Dead"
+			return "阵亡"
 		_:
-			return "Unknown"
+			return "未知"
+
+
+# ----- Plan 3: Enemy Alert UI (polish_plan §3) -----
+# [AI-ASSISTED] 2026-05-22 — screen-edge red wedge indicators for chasing/attacking enemies
+
+func _bind_spawn_manager_ref() -> void:
+	if _spawn_manager != null and is_instance_valid(_spawn_manager):
+		return
+	var scene: Node = get_tree().current_scene
+	if scene == null:
+		return
+	_spawn_manager = scene.get_node_or_null("SpawnManager")
+	if _spawn_manager != null and _spawn_manager.has_signal("spawn_occurred"):
+		if not _spawn_manager.spawn_occurred.is_connected(_on_spawn_occurred):
+			_spawn_manager.spawn_occurred.connect(_on_spawn_occurred)
+
+
+func _update_alert_indicators(_delta: float) -> void:
+	_alert_indicators.clear()
+	var state := GameManager.current_state
+	if state != GameManager.State.RUNNING and state != GameManager.State.EXTRACTING:
+		return
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	var viewport_size := get_viewport_rect().size
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	# Collect raw directions for active enemies within range
+	var raw_entries: Array[Dictionary] = []
+	for enemy in enemies:
+		if not is_instance_valid(enemy):
+			continue
+		if not enemy.has_method("is_awake") or not enemy.is_awake():
+			continue
+		if not enemy.has_method("get_ai_state_name"):
+			continue
+		var ai_state: String = enemy.get_ai_state_name()
+		if ai_state != "CHASE" and ai_state != "ATTACK":
+			continue
+		var dist: float = enemy.global_position.distance_to(GameManager.player_position)
+		if dist > ALERT_DETECTION_RANGE:
+			continue
+		# World direction from player to enemy (XZ plane)
+		var to_enemy: Vector3 = enemy.global_position - GameManager.player_position
+		to_enemy.y = 0.0
+		if to_enemy.length_squared() < 0.01:
+			continue
+		var dir_3d := to_enemy.normalized()
+		# Check if enemy is off-screen or very close to edge
+		var screen_pos := camera.unproject_position(enemy.global_position)
+		var on_x := screen_pos.x >= 0.0 and screen_pos.x <= viewport_size.x
+		var on_y := screen_pos.y >= 0.0 and screen_pos.y <= viewport_size.y
+		var on_screen := on_x and on_y
+		if camera.is_position_behind(enemy.global_position):
+			on_screen = false
+		# Range factor: closer enemies = stronger indicator
+		var range_factor := 1.0 - clampf(dist / ALERT_DETECTION_RANGE, 0.0, 1.0)
+		var pulse_sin := absf(sin(Time.get_ticks_msec() * 0.001 * ALERT_PULSE_SPEED))
+		var pulse_alpha := (0.4 + 0.6 * pulse_sin) * range_factor
+		pulse_alpha = clampf(pulse_alpha, 0.0, ALERT_MAX_OPACITY)
+		var edge_pos := _direction_to_screen_edge(dir_3d, viewport_size, ALERT_EDGE_INSET)
+		raw_entries.append({
+			"screen_pos": edge_pos,
+			"opacity": pulse_alpha,
+			"direction": dir_3d,
+			"on_screen": on_screen,
+		})
+	# Merge nearby indicators by angle
+	var merged: Array[Dictionary] = []
+	for entry in raw_entries:
+		var found_merge := false
+		for m in merged:
+			var angle_diff := rad_to_deg(entry["direction"].angle_to(m["direction"]))
+			if angle_diff < ALERT_MERGE_ANGLE_DEG:
+				m["opacity"] = clampf(m["opacity"] + entry["opacity"] * 0.3, 0.0, ALERT_MAX_OPACITY)
+				found_merge = true
+				break
+		if not found_merge:
+			merged.append(entry.duplicate())
+	_alert_indicators = merged
+
+
+func _draw() -> void:
+	_draw_alert_indicators()
+	_draw_spawn_pulses()
+
+
+func _draw_alert_indicators() -> void:
+	for indicator in _alert_indicators:
+		var pos: Vector2 = indicator["screen_pos"]
+		var alpha: float = indicator["opacity"]
+		var dir_3d: Vector3 = indicator["direction"]
+		var color := Color(1.0, 0.25, 0.15, alpha)
+		_draw_edge_wedge(pos, dir_3d, ALERT_INDICATOR_SIZE, color)
+
+
+# ----- Plan 4: Spawn Pulse (polish_plan §4) -----
+# [AI-ASSISTED] 2026-05-22 — screen-edge orange pulse when enemies spawn
+
+func _on_spawn_occurred(pos: Vector3, _kind: String) -> void:
+	var to_spawn: Vector3 = pos - GameManager.player_position
+	to_spawn.y = 0.0
+	if to_spawn.length_squared() < 0.01:
+		return
+	var dir := to_spawn.normalized()
+	var viewport_size := get_viewport_rect().size
+	var edge_pos := _direction_to_screen_edge(dir, viewport_size, ALERT_EDGE_INSET)
+	_spawn_pulses.append({
+		"screen_pos": edge_pos,
+		"remaining": SPAWN_PULSE_DURATION,
+		"max_time": SPAWN_PULSE_DURATION,
+		"direction": dir,
+	})
+	# Future: _play_directional_audio("spawn_pulse", dir)
+
+
+func _update_spawn_pulses(delta: float) -> void:
+	var i := _spawn_pulses.size() - 1
+	while i >= 0:
+		_spawn_pulses[i]["remaining"] -= delta
+		if _spawn_pulses[i]["remaining"] <= 0.0:
+			_spawn_pulses.remove_at(i)
+		else:
+			# Recalculate screen position each frame (player may have moved)
+			var dir: Vector3 = _spawn_pulses[i]["direction"]
+			var viewport_size := get_viewport_rect().size
+			_spawn_pulses[i]["screen_pos"] = _direction_to_screen_edge(dir, viewport_size, ALERT_EDGE_INSET)
+		i -= 1
+
+
+func _draw_spawn_pulses() -> void:
+	for pulse in _spawn_pulses:
+		var remaining: float = pulse["remaining"]
+		var max_time: float = pulse["max_time"]
+		var elapsed: float = max_time - remaining
+		var alpha := 0.0
+		if elapsed < SPAWN_PULSE_ENTER_TIME:
+			# Fade in
+			alpha = clampf(elapsed / SPAWN_PULSE_ENTER_TIME, 0.0, 1.0)
+		elif remaining > SPAWN_PULSE_FADE_TIME:
+			# Hold
+			alpha = 1.0
+		else:
+			# Fade out
+			alpha = clampf(remaining / SPAWN_PULSE_FADE_TIME, 0.0, 1.0)
+		alpha *= 0.85
+		var pos: Vector2 = pulse["screen_pos"]
+		var dir_3d: Vector3 = pulse["direction"]
+		var color := Color(1.0, 0.7, 0.15, alpha)
+		_draw_edge_wedge(pos, dir_3d, SPAWN_PULSE_SIZE, color)
+
+
+# ----- Shared helpers for edge indicators -----
+
+func _direction_to_screen_edge(dir_3d: Vector3, viewport_size: Vector2, inset: float) -> Vector2:
+	# Map 3D XZ direction to 2D screen-edge position
+	# dir_3d.x → screen horizontal, dir_3d.z → screen vertical (inverted: -z is up on screen)
+	var dir_2d := Vector2(dir_3d.x, -dir_3d.z).normalized()
+	if dir_2d.length_squared() < 0.001:
+		return Vector2(viewport_size.x * 0.5, inset)
+	var center := viewport_size * 0.5
+	var half := center - Vector2(inset, inset)
+	# Find intersection with screen edge rectangle
+	var t_x := absf(half.x / dir_2d.x) if absf(dir_2d.x) > 0.001 else 1e6
+	var t_y := absf(half.y / dir_2d.y) if absf(dir_2d.y) > 0.001 else 1e6
+	var t := minf(t_x, t_y)
+	return center + dir_2d * t
+
+
+func _draw_edge_wedge(pos: Vector2, dir_3d: Vector3, wedge_size: float, color: Color) -> void:
+	# Draw a wedge/triangle pointing from screen edge toward center
+	var dir_2d := Vector2(dir_3d.x, -dir_3d.z).normalized()
+	if dir_2d.length_squared() < 0.001:
+		dir_2d = Vector2.UP
+	# Inward direction (toward center)
+	var inward := -dir_2d
+	# Perpendicular for triangle width
+	var perp := Vector2(-dir_2d.y, dir_2d.x)
+	var half_width := wedge_size * 0.35
+	var tip := pos + inward * wedge_size * 0.6
+	var base_a := pos + perp * half_width
+	var base_b := pos - perp * half_width
+	var points := PackedVector2Array([tip, base_a, base_b])
+	var colors := PackedColorArray([color, color, color])
+	draw_polygon(points, colors)

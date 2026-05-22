@@ -1,12 +1,13 @@
 # expedition_map.gd
 # Self-contained expedition map script.
 # Owns: risk zones, container wiring, container interactions, collision management.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node3D
 
 const EXPEDITION_BOUNDS := Rect2(Vector2(-300.0, -175.0), Vector2(600.0, 350.0))
 const RISK_ZONE_DATA := [
 	{
-		"name": "Ash Outskirts",
+		"name": "灰烬郊外",
 		"center": Vector2(-132.0, 0.0),
 		"size": Vector2(192.0, 210.0),
 		"risk": "low",
@@ -15,7 +16,7 @@ const RISK_ZONE_DATA := [
 		"high_value_weight": 0.15,
 	},
 	{
-		"name": "Broken Rail",
+		"name": "断裂铁轨",
 		"center": Vector2(8.0, -22.0),
 		"size": Vector2(176.0, 182.0),
 		"risk": "low",
@@ -24,7 +25,7 @@ const RISK_ZONE_DATA := [
 		"high_value_weight": 0.25,
 	},
 	{
-		"name": "Black Yard",
+		"name": "黑域场",
 		"center": Vector2(132.0, 8.0),
 		"size": Vector2(184.0, 214.0),
 		"risk": "high",
@@ -33,7 +34,7 @@ const RISK_ZONE_DATA := [
 		"high_value_weight": 0.8,
 	},
 	{
-		"name": "Core Wreck",
+		"name": "核心残骸",
 		"center": Vector2(32.0, 66.0),
 		"size": Vector2(120.0, 92.0),
 		"risk": "high",
@@ -42,7 +43,7 @@ const RISK_ZONE_DATA := [
 		"high_value_weight": 0.95,
 	},
 	{
-		"name": "Frozen Depot",
+		"name": "冰封仓库",
 		"center": Vector2(-200.0, 100.0),
 		"size": Vector2(140.0, 100.0),
 		"risk": "low",
@@ -51,7 +52,7 @@ const RISK_ZONE_DATA := [
 		"high_value_weight": 0.18,
 	},
 	{
-		"name": "Silent Array",
+		"name": "静默阵列",
 		"center": Vector2(220.0, -80.0),
 		"size": Vector2(130.0, 120.0),
 		"risk": "high",
@@ -137,7 +138,7 @@ func get_zone_density_summary() -> Dictionary:
 
 
 func get_player_zone_info() -> Dictionary:
-	var info := {"name": "Wasteland", "risk": "low"}
+	var info := {"name": "废土", "risk": "low"}
 	if _player == null:
 		return info
 	var pos := Vector2(_player.global_position.x, _player.global_position.z)
@@ -150,7 +151,7 @@ func get_player_zone_info() -> Dictionary:
 
 func get_player_risk_label() -> String:
 	var info := get_player_zone_info()
-	return "High Risk" if info["risk"] == "high" else "Low Risk"
+	return "高风险" if info["risk"] == "high" else "低风险"
 
 
 func get_containers_node() -> Node:
@@ -200,19 +201,24 @@ func _update_container_interactions() -> void:
 	if container == null:
 		_set_prompt_text("")
 		return
-	var prompt_pos := (container as Node3D).global_position + Vector3(0.0, 0.0, 1.8) if container is Node3D else Vector3.INF
+	var prompt_pos := (
+		(container as Node3D).global_position + Vector3(0.0, 0.0, 1.8)
+		if container is Node3D
+		else Vector3.INF
+	)
 	if container.has_method("is_opened") and container.is_opened():
 		if not _container_hint_shown:
-			_set_prompt_text("E Search", prompt_pos)
+			_set_prompt_text("E 搜索", prompt_pos)
 		else:
 			_set_prompt_text("")
-		if Input.is_action_just_pressed("interact") and _hud != null and _hud.has_method("open_container_search"):
+		var can_search := _hud != null and _hud.has_method("open_container_search")
+		if Input.is_action_just_pressed("interact") and can_search:
 			_container_hint_shown = true
 			_set_prompt_text("")
 			_hud.open_container_search(container)
 	else:
 		if not _container_hint_shown:
-			_set_prompt_text("Hold E Open", prompt_pos)
+			_set_prompt_text("长按 E 开启", prompt_pos)
 		else:
 			_set_prompt_text("")
 
@@ -223,9 +229,12 @@ func _find_nearby_container() -> Node:
 	var containers := get_node_or_null("Containers")
 	if containers == null:
 		return null
+	var p_pos := _player.global_position
 	for container in containers.get_children():
-		if container is Node3D and _player.global_position.distance_to((container as Node3D).global_position) <= 3.2:
-			return container
+		if container is Node3D:
+			var c_node := container as Node3D
+			if p_pos.distance_to(c_node.global_position) <= 3.2:
+				return container
 	return null
 
 
@@ -238,7 +247,7 @@ func _update_risk_label() -> void:
 	if _hud != null and _hud.has_method("set_zone_info"):
 		_hud.set_zone_info(info["name"], info["risk"])
 	elif _hud != null and _hud.has_method("set_risk_label_text"):
-		_hud.set_risk_label_text("Risk  %s" % get_player_risk_label())
+		_hud.set_risk_label_text("风险  %s" % get_player_risk_label())
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +294,10 @@ func _set_prompt_text(text: String, world_position: Vector3 = Vector3.INF) -> vo
 	if _world_prompt.visible:
 		var target_pos := world_position
 		if target_pos == Vector3.INF:
-			target_pos = _player.global_position + Vector3(0.0, 0.0, 2.8) if _player != null else Vector3.ZERO
+			target_pos = (
+				_player.global_position + Vector3(0.0, 0.0, 2.8)
+				if _player != null
+				else Vector3.ZERO
+			)
 		var y := 0.09 if world_position == Vector3.INF else maxf(target_pos.y + 0.01, 0.09)
 		_world_prompt.global_position = Vector3(target_pos.x, y, target_pos.z)

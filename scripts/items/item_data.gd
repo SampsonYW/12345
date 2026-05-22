@@ -1,5 +1,7 @@
 # item_data.gd
+# 物品数据定义 (Resource)：存储物品重量、分值、图标颜色及消耗品效果等基础属性。
 # Item resource data used by containers, pickups, inventory, and scoring.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Resource
 class_name ItemData
 

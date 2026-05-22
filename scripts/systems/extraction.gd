@@ -1,6 +1,8 @@
 # extraction.gd
+# 撤离系统：信号弹发射后开启倒计时，时间结束母车到达，玩家靠近即成功撤离。
 # Signal flare extraction flow: wait, arrival marker, boarding, and success.
 # [AI-ASSISTED] 2026-05-20 - Day 4 P0 extraction loop.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node3D
 
 @export var wait_time: float = 75.0
@@ -65,10 +67,10 @@ func try_board() -> bool:
 
 func get_status_text() -> String:
 	if _arrived:
-		return "Board [E]"
+		return "登船 [E]"
 	if _waiting:
-		return "Arrives %ds" % int(ceil(get_remaining_time()))
-	return "Ready" if not GameManager.signal_flare_used else "Fired"
+		return "到达倒计时 %d秒" % int(ceil(get_remaining_time()))
+	return "就绪" if not GameManager.signal_flare_used else "已发射"
 
 
 func get_extraction_direction(from_position: Vector3 = Vector3.ZERO) -> Vector3:
@@ -163,5 +165,3 @@ func _clear_marker() -> void:
 			_marker.get_parent().remove_child(_marker)
 		_marker.free()
 	_marker = null
-
-

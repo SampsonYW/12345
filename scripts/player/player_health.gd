@@ -1,5 +1,7 @@
 # player_health.gd
+# 生命系统：管理玩家 HP、受击侵蚀增加、血量耗尽触发 DEAD 局状态。
 # Player HP, invulnerability frames, damage erosion, healing, and death state.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node
 
 signal damaged

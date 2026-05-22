@@ -1,5 +1,6 @@
 # noise_manager.gd
-# Autoload singleton for 3D noise propagation.
+# Autoload singleton for sound level broadcasting and alert updates.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node
 
 enum Level {

@@ -2,6 +2,7 @@
 # 编辑器导入缓存 / shader cache / mono cache / global script class cache
 # 这个目录每次打开项目都会被重新生成，不要提交
 .godot/
+*.pck
 
 # 安卓导出生成的目录（如果做安卓导出会自动出现）
 /android/
@@ -18,6 +19,7 @@ mono_crash.*.json
 
 # --- Claude Code 状态（每个开发者本地的会话/任务/工作区） ---
 .claude/
+.antigravitycli/
 .worktrees/
 
 # --- 二进制可执行文件 ---

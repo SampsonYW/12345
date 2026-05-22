@@ -1,6 +1,8 @@
 # player_shooting_3d.gd
+# 射击系统：管理玩家主武器开火、弹药限制、装弹冷却和射击噪音触发。
 # 3D 玩家射击：从 FirePoint 沿玩家瞄准方向生成 3D 子弹，保留弹药信号接口给 HUD。
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写射击
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node
 
 signal ammo_changed(current: int, max_value: int)
@@ -49,7 +51,7 @@ func fire() -> void:
 		return
 	var bullet := _get_pooled_bullet()
 	if bullet == null:
-		push_warning("PlayerShooting3D bullet pool exhausted")
+		push_warning("PlayerShooting3D 子弹池已耗尽")
 		return
 	var dir: Vector3 = _get_fire_direction()
 	if bullet.has_method("activate"):

@@ -5,6 +5,7 @@
 # 视野锥长度随侵蚀缩短。
 # 文件名沿用 fog_of_war 以保留 fog_of_war.tscn 的 script path 引用与 .uid。
 # [AI-ASSISTED] 2026-05-21 - 由"探索迷雾"重构为"可视视野" (design.md §9.6)
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node3D
 
 @export_group("Vision Shape")
@@ -317,7 +318,11 @@ func _make_cone_fan_mesh(segments: int) -> ArrayMesh:
 	return mesh
 
 
-func _make_translucent_material(albedo: Color, emission: Color, emission_energy: float) -> StandardMaterial3D:
+func _make_translucent_material(
+	albedo: Color,
+	emission: Color,
+	emission_energy: float
+) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = albedo
 	material.roughness = 0.9

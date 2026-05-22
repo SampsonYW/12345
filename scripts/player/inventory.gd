@@ -1,5 +1,7 @@
 # inventory.gd
+# 背包系统：挂载于 Player 的数据组件，管理物品槽、负重、分数结算和物品消耗。
 # Player inventory: eight slots, weight limits, pickups, item use, and scoring.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node
 
 const SLOT_COUNT: int = 8
@@ -24,14 +26,14 @@ func add_item(item: ItemDataResource) -> bool:
 	if item == null:
 		return false
 	if GameManager.player_erosion >= GameManager.max_erosion:
-		pickup_blocked.emit("Erosion maxed. Cannot pick up more.")
+		pickup_blocked.emit("侵蚀已达上限，无法拾取更多。")
 		return false
 	var empty_idx: int = _find_empty_slot()
 	if empty_idx < 0:
-		pickup_blocked.emit("Inventory full")
+		pickup_blocked.emit("背包已满")
 		return false
 	if get_current_weight() + item.weight > GameManager.max_weight:
-		pickup_blocked.emit("Weight limit exceeded")
+		pickup_blocked.emit("负重超限")
 		return false
 	slots[empty_idx] = item
 	_emit_all()
@@ -69,7 +71,7 @@ func use_slot(idx: int) -> bool:
 		return false
 	match item.type:
 		ItemDataResource.Type.COLLECTIBLE:
-			use_blocked.emit("Relics are scored only after extraction.")
+			use_blocked.emit("残响碎片仅在撤离后结算分数。")
 			return false
 		ItemDataResource.Type.AMMO:
 			var ps: Node = get_parent().get_node_or_null("PlayerShooting")
