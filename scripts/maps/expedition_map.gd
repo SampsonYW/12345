@@ -137,7 +137,7 @@ func get_zone_density_summary() -> Dictionary:
 
 
 func get_player_zone_info() -> Dictionary:
-	var info := {"name": "", "risk": "low"}
+	var info := {"name": "Wasteland", "risk": "low"}
 	if _player == null:
 		return info
 	var pos := Vector2(_player.global_position.x, _player.global_position.z)

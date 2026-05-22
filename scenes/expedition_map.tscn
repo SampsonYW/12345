@@ -1,4 +1,4 @@
-[gd_scene load_steps=71 format=3 uid="uid://expeditionmap00001"]
+[gd_scene load_steps=67 format=3 uid="uid://expeditionmap00001"]
 
 [ext_resource type="PackedScene" path="res://scenes/container_3d.tscn" id="1_container"]
 [ext_resource type="Resource" path="res://resources/items/relic_small.tres" id="2_relic"]
@@ -26,39 +26,27 @@ transparency = 1
 albedo_color = Color(0.35, 0.1, 0.12, 0.34)
 
 [sub_resource type="BoxMesh" id="mesh_zone1"]
-size = Vector3(192, 0.03, 210)
+size = Vector3(192, 0.002, 210)
 material = SubResource("mat_zone_low")
-
-[sub_resource type="BoxShape3D" id="shape_zone1"]
-size = Vector3(192, 0.03, 210)
 
 [sub_resource type="BoxMesh" id="mesh_zone2"]
-size = Vector3(176, 0.03, 182)
+size = Vector3(176, 0.002, 182)
 material = SubResource("mat_zone_low")
 
-[sub_resource type="BoxShape3D" id="shape_zone2"]
-size = Vector3(176, 0.03, 182)
-
 [sub_resource type="BoxMesh" id="mesh_zone3"]
-size = Vector3(120, 0.03, 92)
+size = Vector3(120, 0.002, 92)
 material = SubResource("mat_zone_high")
-
-[sub_resource type="BoxShape3D" id="shape_zone3"]
-size = Vector3(120, 0.03, 92)
 
 [sub_resource type="BoxMesh" id="mesh_zone4"]
-size = Vector3(184, 0.03, 214)
+size = Vector3(184, 0.002, 214)
 material = SubResource("mat_zone_high")
 
-[sub_resource type="BoxShape3D" id="shape_zone4"]
-size = Vector3(184, 0.03, 214)
-
 [sub_resource type="BoxMesh" id="mesh_zone5"]
-size = Vector3(140, 0.03, 100)
+size = Vector3(140, 0.002, 100)
 material = SubResource("mat_zone_low")
 
 [sub_resource type="BoxMesh" id="mesh_zone6"]
-size = Vector3(130, 0.03, 120)
+size = Vector3(130, 0.002, 120)
 material = SubResource("mat_zone_high")
 
 [sub_resource type="StandardMaterial3D" id="mat_obstacle"]
@@ -250,27 +238,27 @@ shape = SubResource("shape_ground")
 [node name="RiskZones" type="Node3D" parent="."]
 
 [node name="AshOutskirts" type="MeshInstance3D" parent="RiskZones"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -132, 0.015, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -132, 0.001, 0)
 mesh = SubResource("mesh_zone1")
 
 [node name="BrokenRail" type="MeshInstance3D" parent="RiskZones"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.015, -22)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0.001, -22)
 mesh = SubResource("mesh_zone2")
 
 [node name="CoreWreck" type="MeshInstance3D" parent="RiskZones"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.015, 66)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.001, 66)
 mesh = SubResource("mesh_zone3")
 
 [node name="BlackYard" type="MeshInstance3D" parent="RiskZones"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 132, 0.015, 8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 132, 0.001, 8)
 mesh = SubResource("mesh_zone4")
 
 [node name="FrozenDepot" type="MeshInstance3D" parent="RiskZones"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -200, 0.015, 100)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -200, 0.001, 100)
 mesh = SubResource("mesh_zone5")
 
 [node name="SilentArray" type="MeshInstance3D" parent="RiskZones"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 220, 0.015, -80)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 220, 0.001, -80)
 mesh = SubResource("mesh_zone6")
 
 [node name="Obstacles" type="Node3D" parent="."]
