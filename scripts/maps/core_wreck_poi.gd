@@ -133,7 +133,7 @@ const OBSTACLES := [
 ## POI 的逻辑 zone 定义（HUD 显示 + spawn_manager 密度查询用）
 static func get_zone_def() -> Dictionary:
 	return {
-		"name": "Core Wreck",
+		"name": "核心残骸",
 		"center": POI_CENTER,
 		"size": POI_SIZE,
 		"risk": "high",

@@ -89,7 +89,7 @@ const SPAWNS := [
 
 static func get_zone_def() -> Dictionary:
 	return {
-		"name": "South Approach",
+		"name": "南方走廊",
 		"center": POI_CENTER + COMPACT_OFFSET,
 		"size": POI_SIZE,
 		"risk": "low",

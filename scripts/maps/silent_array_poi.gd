@@ -119,7 +119,7 @@ const OBSTACLES := [
 
 static func get_zone_def() -> Dictionary:
 	return {
-		"name": "Silent Array",
+		"name": "静默阵列",
 		"center": POI_CENTER + COMPACT_OFFSET,
 		"size": POI_SIZE,
 		"risk": "high",

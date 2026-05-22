@@ -92,7 +92,7 @@ const OBSTACLES := [
 
 static func get_zone_def() -> Dictionary:
 	return {
-		"name": "Ash Outskirts",
+		"name": "灰烬郊外",
 		"center": POI_CENTER + COMPACT_OFFSET,
 		"size": POI_SIZE,
 		"risk": "low",
