@@ -199,4 +199,3 @@ outline_modulate = Color(0.1, 0.08, 0.04, 0.5)
 text = "余晖号"
 font_size = 192
 outline_size = 8
-

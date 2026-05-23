@@ -685,7 +685,7 @@ func _billboard_bars() -> void:
 		var dir: Vector3 = cam_pos - bar_pos
 		dir.y = 0.0
 		if dir.length_squared() > 0.01:
-			node.look_at(bar_pos - dir, Vector3.UP)
+			node.look_at(bar_pos + dir, Vector3.UP)
 
 
 func _die() -> void:

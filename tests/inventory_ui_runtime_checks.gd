@@ -84,9 +84,12 @@ func _run() -> void:
 		scene.set_player_near_afterglow_point("warehouse")
 	await process_frame
 	if hud.has_method("get_prompt_text"):
-		_expect(hud.get_prompt_text().find("Storage") >= 0, "Warehouse prompt appears in range")
-	var warehouse_hint := scene.get_node_or_null("World/AfterglowMap/WarehouseHint") as Label3D
-	_expect(warehouse_hint != null and warehouse_hint.visible and warehouse_hint.text.find("Storage") >= 0, "Warehouse prompt renders as world-space ground text")
+		_expect(hud.get_prompt_text().find("仓库") >= 0, "Warehouse prompt appears in range")
+	var world_prompt := scene.get_node_or_null("World/WorldPrompt") as Label3D
+	_expect(
+		world_prompt != null and world_prompt.visible and world_prompt.text.find("仓库") >= 0,
+		"Warehouse prompt renders as world-space ground text"
+	)
 	_expect(scene.get_node_or_null("World/AfterglowMap/WarehouseCollision") != null, "Warehouse has physical collision")
 	_expect(hud.has_method("transfer_storage_item_to_backpack"), "Storage UI exposes warehouse-to-backpack transfer")
 	_expect(hud.has_method("transfer_backpack_slot_to_storage"), "Storage UI exposes backpack-to-warehouse transfer")
@@ -95,12 +98,19 @@ func _run() -> void:
 	if hud.has_method("open_storage"):
 		hud.open_storage()
 	await process_frame
-	_expect(hud.get_node_or_null("StorageOverlay") != null, "Storage overlay exists")
-	_expect(hud.get_node_or_null("StorageOverlay/BackpackGrid") != null, "Storage UI has backpack grid")
-	_expect(hud.get_node_or_null("StorageOverlay/WarehouseList") != null, "Storage UI has warehouse list")
+	var storage_overlay := hud.get_node_or_null("StorageOverlay")
+	_expect(storage_overlay != null, "Storage overlay exists")
+	_expect(
+		storage_overlay != null and storage_overlay.find_child("BackpackGrid", true, false) != null,
+		"Storage UI has backpack grid"
+	)
+	_expect(
+		storage_overlay != null and storage_overlay.find_child("WarehouseList", true, false) != null,
+		"Storage UI has warehouse list"
+	)
 	_expect(hud.has_method("get_visible_backpack_item_names"), "HUD exposes visible backpack names for tests")
 	if hud.has_method("get_visible_backpack_item_names"):
-		_expect(hud.get_visible_backpack_item_names().size() > 0, "Backpack item names exist only inside overlay")
+		_expect(hud.get_visible_backpack_item_names().is_empty(), "Empty backpack shows no item names inside overlay")
 	if hud.has_method("transfer_storage_item_to_backpack") and hud.has_method("transfer_backpack_slot_to_storage"):
 		var moved_to_backpack: bool = hud.transfer_storage_item_to_backpack("能量电池")
 		_expect(moved_to_backpack, "Warehouse item can move into backpack through shared transfer API")

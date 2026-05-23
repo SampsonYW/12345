@@ -89,7 +89,9 @@ func seed_initial_enemies() -> void:
 		return
 	_initial_spawned = true
 
-	var map = get_node_or_null("../World/ExpeditionMap")
+	var map := get_parent().get_node_or_null("World/ExpeditionMap") if get_parent() != null else null
+	if map == null and get_tree().current_scene != null:
+		map = get_tree().current_scene.get_node_or_null("World/ExpeditionMap")
 	var initial_spawns = map.get_node_or_null("InitialSpawns") if map != null else null
 	if initial_spawns != null:
 		for spawn in initial_spawns.get_children():

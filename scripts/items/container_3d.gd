@@ -7,7 +7,6 @@ extends StaticBody3D
 
 signal cracked(container: StaticBody3D)
 
-const ITEM_PICKUP_SCENE := preload("res://scenes/item_pickup_3d.tscn")
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
 
 ## 容器的最大条目数（loot + 玩家放回的物品之和），跟 HUD 里 ContainerGrid 的格子数一致
@@ -17,7 +16,6 @@ const MAX_ENTRIES: int = 12
 @export var risk: String = "low"
 @export var base_crack_time: float = 2.0
 @export var base_search_time: float = 1.0
-@export var pickup_spread_radius: float = 1.5
 
 var _is_cracked: bool = false
 var _crack_progress: float = 0.0
@@ -240,31 +238,6 @@ func _get_rarity_search_multiplier(rarity: int) -> float:
 			return 3.5
 		_:
 			return 1.0
-
-
-func _spawn_pickups() -> void:
-	if loot_table.is_empty():
-		return
-	var n: int = loot_table.size()
-	var pickup_parent := _find_pickup_parent()
-	for i in n:
-		var angle: float = TAU * float(i) / float(n)
-		var offset := Vector3(cos(angle), 0.0, sin(angle)) * pickup_spread_radius
-		var pickup: Area3D = ITEM_PICKUP_SCENE.instantiate()
-		pickup.item_data = loot_table[i]
-		pickup_parent.add_child(pickup)
-		pickup.global_position = global_position + offset
-
-
-func _find_pickup_parent() -> Node:
-	var scene: Node = get_tree().current_scene
-	var entities: Node = scene.get_node_or_null("Entities")
-	if entities:
-		var pickups: Node = entities.get_node_or_null("Pickups")
-		if pickups:
-			return pickups
-		return entities
-	return scene
 
 
 func _set_visual_color(color: Color) -> void:

@@ -1121,9 +1121,11 @@ func _set_run_hud_visible(is_show: bool) -> void:
 	slots_container.visible = false
 	if _prompt_label != null:
 		_prompt_label.visible = false
+	var show_expedition_ui := is_show and GameManager.current_location == GameManager.Location.EXPEDITION
 	if _minimap != null:
-		var is_expedition := GameManager.current_location == GameManager.Location.EXPEDITION
-		_minimap.visible = is_show and is_expedition
+		_minimap.visible = show_expedition_ui
+	if _sprint_container != null:
+		_sprint_container.visible = show_expedition_ui
 	blocked_label.visible = is_show and blocked_label.visible
 
 

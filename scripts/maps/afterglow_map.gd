@@ -85,7 +85,7 @@ func _update_interactions(delta: float) -> void:
 	if nearby == "warehouse":
 		_departure_hold = 0.0
 		_set_prompt_text("E 打开仓库")
-		if Input.is_action_pressed("interact") and not GameManager.ui_blocking_input:
+		if Input.is_action_just_pressed("interact") and not GameManager.ui_blocking_input:
 			if _hud != null and _hud.has_method("open_storage"):
 				_hud.open_storage()
 	elif nearby == "departure":

@@ -85,7 +85,7 @@ func _check_patrol_sight_requires_range_and_angle() -> void:
 
 	player.global_position = Vector3(0.0, 0.0, 5.0)
 	_expect(not enemy.can_see_player(player), "Patrol enemy should not see a player behind its facing direction")
-	enemy._update_patrol(player)
+	enemy._update_patrol(player, 0.0)
 	_expect(enemy.get_ai_state_name() == "PATROL", "Patrol enemy should not chase a player behind it")
 	_cleanup(enemy)
 
@@ -94,7 +94,7 @@ func _check_patrol_sight_requires_range_and_angle() -> void:
 	front_enemy.view_range = 6.0
 	front_enemy.view_angle = 60.0
 	player.global_position = Vector3(0.0, 0.0, -5.0)
-	front_enemy._update_patrol(player)
+	front_enemy._update_patrol(player, 0.0)
 	_expect(front_enemy.get_ai_state_name() == "CHASE", "Patrol enemy should chase after seeing player in its vision cone")
 
 	_cleanup(front_enemy)
