@@ -52,6 +52,7 @@ project/
 |------|----------|------|
 | `GameManager` | `scripts/managers/game_manager.gd` | 全局状态、侵蚀、计时、信号弹状态 |
 | `NoiseManager` | `scripts/managers/noise_manager.gd` | 噪音传播 & 警戒值 |
+| `PathfindManager` | `scripts/managers/pathfind_manager.gd` | A* 网格寻路（敌人绕墙追击） |
 
 新增 Autoload 必须：
 1. 放在 `scripts/managers/` 下

@@ -154,6 +154,9 @@ func _notify_enemies_of_signal(origin: Vector3) -> void:
 	var tree := get_tree()
 	if tree == null:
 		return
+	# 信号弹的噪音传播由 player_3d.gd 中 NoiseManager.emit_noise(GLOBAL) 完成，
+	# 敌人通过 receive_noise() 接收距离衰减后的噪音值，达到警戒阈值后自然唤醒。
+	# 这里只通知敌人信号弹的位置，让它们向信号弹位置移动。
 	for enemy in tree.get_nodes_in_group("enemies"):
 		if enemy != null and enemy.has_method("react_to_signal_flare"):
 			enemy.react_to_signal_flare(origin, _landing_position)

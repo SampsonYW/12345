@@ -211,6 +211,9 @@ func _apply_location(location: int) -> void:
 		_reset_expedition_map()
 		if _expedition_map != null and _expedition_map.has_method("activate"):
 			_expedition_map.activate(_player, _hud, _world_prompt)
+		# 构建 A* 寻路网格（延迟到下一物理帧，确保障碍物已注册）
+		if _expedition_map != null and _expedition_map.has_method("get_bounds"):
+			PathfindManager.build_grid(_expedition_map.get_bounds())
 		if _player != null:
 			_player.global_position = Vector3.ZERO
 			GameManager.player_position = _player.global_position

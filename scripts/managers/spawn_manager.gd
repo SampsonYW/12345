@@ -200,6 +200,23 @@ func sample_curve(t: float) -> float:
 func get_farthest_spawn_point() -> Vector3:
 	if _signal_active:
 		set_visible_spawn_avoidance(GameManager.player_position, maxf(_visible_avoidance_radius, 28.0))
+		# 信号弹阶段：优先选择靠近信号弹位置的刷怪点
+		var signal_position := GameManager.signal_flare_position
+		var signal_valid: Array[Vector3] = []
+		for point in _spawn_points:
+			if point.distance_to(GameManager.player_position) >= minimum_spawn_distance:
+				signal_valid.append(point)
+		if not signal_valid.is_empty():
+			# 按距离信号弹位置排序（近的优先）
+			signal_valid.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+				return a.distance_to(signal_position) < b.distance_to(signal_position)
+			)
+			var candidate_count: int = mini(signal_valid.size(), 3)
+			var point := signal_valid[_spawn_point_cursor % candidate_count]
+			_spawn_point_cursor += 1
+			_last_spawn_point = point
+			return point
+
 	var valid := _get_ranked_spawn_points()
 	if valid.is_empty():
 		return Vector3.ZERO

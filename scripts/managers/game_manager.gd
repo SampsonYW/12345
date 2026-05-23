@@ -14,7 +14,7 @@ signal ui_blocking_changed(blocked: bool)
 enum State { PREPARING, RUNNING, EXTRACTING, SUCCESS, DEAD }
 enum Location { TITLE, AFTERGLOW, EXPEDITION }
 
-const EROSION_RATE := 0.0167
+const EROSION_RATE := 0.0417  # 约每 60 秒 +2.5%（旧值 0.0167 ≈ 1%/min）
 const HIT_EROSION_AMOUNT := 2.5
 const PURIFIER_REDUCTION := 17.5
 

@@ -2,16 +2,30 @@
 # Self-contained Afterglow Express (母车) map script.
 # Owns: warehouse/departure interactions, collision management.
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
+# [AI-ASSISTED] 2026-05-23 — 添加甲板边界墙壁和出发门碰撞体
 extends Node3D
 
 const INTERACTION_RANGE := 3.25
 const DEPARTURE_HOLD_TIME := 1.4
+
+# 甲板尺寸（与 .tscn 中 Box_deck size 一致）
+const DECK_WIDTH := 92.0
+const DECK_DEPTH := 52.0
+const WALL_HEIGHT := 2.5
+const WALL_THICKNESS := 0.5
 
 var _player: Node3D = null
 var _hud: Node = null
 var _world_prompt: Label3D = null
 var _departure_hold: float = 0.0
 var _active_point: String = ""
+var _walls_built: bool = false
+
+
+func _ready() -> void:
+	if not _walls_built:
+		_build_boundary_walls()
+		_walls_built = true
 
 
 func activate(player: Node3D, hud: Node, world_prompt: Label3D = null) -> void:
@@ -178,3 +192,53 @@ func _show_progress(ratio: float, text: String = "") -> void:
 func _hide_progress() -> void:
 	if _hud != null and _hud.has_method("hide_hold_progress"):
 		_hud.hide_hold_progress()
+
+
+# ---------------------------------------------------------------------------
+# Boundary walls (甲板边界碰撞 + 出发门碰撞)
+# ---------------------------------------------------------------------------
+
+## 在甲板四周创建不可见碰撞墙壁，防止玩家走出船体
+## 同时为 DepartureDoor 添加碰撞体
+func _build_boundary_walls() -> void:
+	var half_w := DECK_WIDTH * 0.5
+	var half_d := DECK_DEPTH * 0.5
+	var hy := WALL_HEIGHT * 0.5
+	var ht := WALL_THICKNESS * 0.5
+
+	# 北墙（-Z 方向）
+	_add_wall_body("WallNorth",
+		Vector3(0.0, hy, -half_d - ht),
+		Vector3(DECK_WIDTH, WALL_HEIGHT, WALL_THICKNESS))
+	# 南墙（+Z 方向）
+	_add_wall_body("WallSouth",
+		Vector3(0.0, hy, half_d + ht),
+		Vector3(DECK_WIDTH, WALL_HEIGHT, WALL_THICKNESS))
+	# 西墙（-X 方向）
+	_add_wall_body("WallWest",
+		Vector3(-half_w - ht, hy, 0.0),
+		Vector3(WALL_THICKNESS, WALL_HEIGHT, DECK_DEPTH + WALL_THICKNESS * 2.0))
+	# 东墙（+X 方向）
+	_add_wall_body("WallEast",
+		Vector3(half_w + ht, hy, 0.0),
+		Vector3(WALL_THICKNESS, WALL_HEIGHT, DECK_DEPTH + WALL_THICKNESS * 2.0))
+
+	# DepartureDoor 碰撞（位置/尺寸与 .tscn 中 DepartureDoor MeshInstance3D 一致）
+	_add_wall_body("DepartureDoorCollision",
+		Vector3(32.0, 1.3, 19.0),
+		Vector3(9.0, 2.6, 1.0))
+
+
+func _add_wall_body(wall_name: String, pos: Vector3, size: Vector3) -> void:
+	var body := StaticBody3D.new()
+	body.name = wall_name
+	body.collision_layer = 4  # layer 3: Obstacles (per rules.md §3.2)
+	body.collision_mask = 0
+	var shape_node := CollisionShape3D.new()
+	shape_node.name = "Shape"
+	var box := BoxShape3D.new()
+	box.size = size
+	shape_node.shape = box
+	body.add_child(shape_node)
+	add_child(body)
+	body.global_position = pos
