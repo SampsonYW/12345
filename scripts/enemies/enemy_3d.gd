@@ -3,6 +3,7 @@
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写敌人占位逻辑
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 # [AI-ASSISTED] 2026-05-23 — 追击/信号弹寻路升级为 A* 网格寻路（绕墙/拐角）
+# [AI-ASSISTED] 2026-05-24 — 寻路迁移到 Godot NavigationServer3D + NavigationAgent3D，删除自建 A*
 extends CharacterBody3D
 
 signal died(enemy: CharacterBody3D)
@@ -56,24 +57,19 @@ var _last_positions: Array[Vector3] = []
 var _obstacle_avoidance_cooldown: float = 0.0
 var _current_avoidance_dir: Vector3 = Vector3.ZERO
 var _patrol_retry_count: int = 0
-var _chase_last_player_pos: Vector3 = Vector3.ZERO
-var _chase_path_timer: float = 0.0
-var _astar_path: Array[Vector3] = []
-var _astar_path_index: int = 0
-var _astar_refresh_timer: float = 0.0
-var _pathfind_manager_cache: Node = null
+var _nav_agent: NavigationAgent3D = null
 
 
 func _ready() -> void:
 	add_to_group("enemies")
 	_ensure_alert_bar()
 	_ensure_hp_bar()
+	_nav_agent = get_node_or_null("NavAgent") as NavigationAgent3D
 	_home_position = global_position
 	_state = State.PATROL if enemy_type == EnemyType.PATROL else State.SLEEP
 	_is_awake = enemy_type == EnemyType.PATROL
 	_erosion_tier = _get_erosion_tier()
 	_current_hp = get_scaled_hp()
-	_chase_last_player_pos = _home_position
 	_pick_patrol_target()
 	_update_alert_bar()
 	_update_hp_bar()
@@ -247,12 +243,6 @@ func _update_chase(player: Node3D, delta: float) -> void:
 			_update_signal_focus(delta)
 			return
 
-	_chase_path_timer -= delta
-	_astar_refresh_timer -= delta
-
-	if _try_stuck_recovery(delta):
-		return
-
 	var to_player: Vector3 = player.global_position - global_position
 	to_player.y = 0.0
 	var dist: float = to_player.length()
@@ -261,31 +251,10 @@ func _update_chase(player: Node3D, delta: float) -> void:
 		velocity = Vector3.ZERO
 		return
 
-	# 定期更新玩家位置缓存，避免玩家移动后目标过时
-	if _chase_path_timer <= 0.0:
-		_chase_last_player_pos = player.global_position
-		_chase_path_timer = 0.5
-
-	# 能直线看到玩家时保持直线追击（更自然）
-	if _has_clear_line_to_player(player):
-		_astar_path.clear()
-		var to_chase_target: Vector3 = _chase_last_player_pos - global_position
-		to_chase_target.y = 0.0
-		if _has_obstacle_ahead(to_chase_target, chase_speed * delta):
-			var avoid_dir := _get_avoidance_direction(to_chase_target)
-			_move_flat(avoid_dir, chase_speed * 0.7)
-		else:
-			_move_flat(to_chase_target, chase_speed)
-		return
-
-	# 看不到玩家 → 用 A* 寻路绕过障碍物
-	_follow_astar_path(player.global_position, chase_speed, delta)
+	_nav_move_toward(player.global_position, chase_speed)
 
 
 func _update_signal_focus(delta: float) -> void:
-	_astar_refresh_timer -= delta
-	if _try_stuck_recovery(delta):
-		return
 	var to_focus: Vector3 = _signal_focus_position - global_position
 	to_focus.y = 0.0
 	var dist_to_signal: float = to_focus.length()
@@ -299,17 +268,29 @@ func _update_signal_focus(delta: float) -> void:
 		return
 
 	var move_speed := maxf(chase_speed, patrol_speed)
-	# 能直线到达信号弹位置时直线移动
-	if _has_clear_line_to_point(_signal_focus_position):
-		_astar_path.clear()
-		if _has_obstacle_ahead(to_focus, move_speed * delta):
-			var avoid_dir := _get_avoidance_direction(to_focus)
-			_move_flat(avoid_dir, move_speed * 0.7)
-		else:
-			_move_flat(to_focus, move_speed)
-	else:
-		# 看不到信号弹位置 → A* 寻路
-		_follow_astar_path(_signal_focus_position, move_speed, delta)
+	_nav_move_toward(_signal_focus_position, move_speed)
+
+
+## 用 NavigationAgent3D 向目标移动。设置 target_position 让 nav server 算路径，
+## 沿 get_next_path_position() 走 waypoint。NavMesh 几何精确，
+## 不需要手写避障——障碍物（高/矮/箱子）在 navmesh bake 时已被排除。
+func _nav_move_toward(target_pos: Vector3, speed: float) -> void:
+	if _nav_agent == null:
+		velocity = Vector3.ZERO
+		return
+	_nav_agent.target_position = target_pos
+	if _nav_agent.is_navigation_finished():
+		velocity = Vector3.ZERO
+		return
+	var next_pos: Vector3 = _nav_agent.get_next_path_position()
+	var dir: Vector3 = next_pos - global_position
+	dir.y = 0.0
+	if dir.length_squared() <= 0.01:
+		velocity = Vector3.ZERO
+		return
+	var n_dir := dir.normalized()
+	velocity = n_dir * speed
+	_face_direction(n_dir)
 
 
 func _update_attack(delta: float, player: Node3D) -> void:
@@ -515,79 +496,6 @@ func _has_clear_line_to_point(target_pos: Vector3) -> bool:
 	)
 	query.exclude = [get_rid()]
 	return space_state.intersect_ray(query).is_empty()
-
-
-## A* 寻路：沿路径点逐一移动
-func _follow_astar_path(target: Vector3, speed: float, delta: float) -> void:
-	# 定期刷新路径或路径为空时重新请求
-	if _astar_path.is_empty() or _astar_refresh_timer <= 0.0:
-		_request_astar_path(target)
-		_astar_refresh_timer = 1.0
-
-	if _astar_path.is_empty():
-		# 回退：直线移动 + 避障
-		var to_target: Vector3 = target - global_position
-		to_target.y = 0.0
-		if _has_obstacle_ahead(to_target, speed * delta):
-			var avoid_dir := _get_avoidance_direction(to_target)
-			_move_flat(avoid_dir, speed * 0.7)
-		else:
-			_move_flat(to_target, speed)
-		return
-
-	# 沿路径点移动
-	if _astar_path_index >= _astar_path.size():
-		_astar_path.clear()
-		return
-
-	var waypoint: Vector3 = _astar_path[_astar_path_index]
-	var to_waypoint: Vector3 = waypoint - global_position
-	to_waypoint.y = 0.0
-
-	# 到达当前路径点后切换下一个
-	var threshold := _get_path_threshold()
-	if to_waypoint.length() <= threshold:
-		_astar_path_index += 1
-		if _astar_path_index >= _astar_path.size():
-			_astar_path.clear()
-			return
-		waypoint = _astar_path[_astar_path_index]
-		to_waypoint = waypoint - global_position
-		to_waypoint.y = 0.0
-
-	# 微观避障（处理格子边缘精度不足）
-	if _has_obstacle_ahead(to_waypoint, speed * delta):
-		var avoid_dir := _get_avoidance_direction(to_waypoint)
-		_move_flat(avoid_dir, speed * 0.7)
-	else:
-		_move_flat(to_waypoint, speed)
-
-
-func _request_astar_path(target: Vector3) -> void:
-	_astar_path.clear()
-	_astar_path_index = 0
-	var pm := _get_pathfind_manager()
-	if pm == null or not pm.is_ready():
-		return
-	var path: Array[Vector3] = pm.find_path(global_position, target)
-	if path.size() > 1:
-		# 跳过第一个点（当前位置附近）
-		_astar_path = path.slice(1)
-
-
-func _get_path_threshold() -> float:
-	var pm := _get_pathfind_manager()
-	if pm != null:
-		return pm.get_cell_size() * 0.6
-	return 1.2
-
-
-func _get_pathfind_manager() -> Node:
-	if _pathfind_manager_cache == null or not is_instance_valid(_pathfind_manager_cache):
-		var tree := get_tree()
-		if tree != null:
-			_pathfind_manager_cache = tree.root.get_node_or_null("PathfindManager")
-	return _pathfind_manager_cache
 
 
 func _get_player() -> Node3D:

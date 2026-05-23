@@ -288,6 +288,30 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 
 ⚠️ 这个脚本同时承担"巡逻型"和"休眠型"两种行为是当前的简化。如果后续两种类型差异变大（如休眠型加觉醒动画、巡逻型加路径点），需要按 rules.md §3.1 的"不超过 2 层继承"原则拆 base + 两个子类。
 
+### 6.3 AI 流程（追击、视线、寻路）
+
+状态机 `SLEEP / PATROL / CHASE / ATTACK` 的转移触发：
+
+- `PATROL → CHASE`：`_update_patrol` 里 `can_see_player(player)` 通过（视野角度 + 距离 + 视线无遮挡），调 `force_awaken()` 切到 CHASE。
+- `SLEEP → CHASE`：`receive_noise(value)` 累积 `_current_alert ≥ alert_threshold`，或 `take_damage(_, from_player=true)` 直接 `force_awaken()`。
+- `CHASE → ATTACK`：到玩家距离 ≤ `attack_range`。`ATTACK → CHASE`：玩家拉开 > `attack_range * 1.4`。
+- 信号弹：`react_to_signal_flare(origin, extraction_position)` 把 `_signal_focus_position` 设为撤离点，已唤醒的怪进 CHASE 但在 chase 内走信号弹分支。
+- ⚠️ 当前没有 `CHASE → PATROL` 的「丢失仇恨」路径，怪一旦唤醒永久追击（除信号弹到达分支会让 PATROL 型怪重新进入 PATROL）。
+
+**视线检测**（`_has_clear_line_to_player` / `_has_clear_line_to_point`，y=0.7 高度射线，`vision_obstacle_mask = 4` 只看高墙）：用于「发现玩家」/「信号弹分支判断能否看到玩家」。箱子和矮障碍**不挡视线**，巡逻怪可以透过箱子/矮障碍发现玩家。
+
+**追击移动**：`_update_chase` 和 `_update_signal_focus` 通过 `_nav_move_toward(target_pos, speed)` 委托给 NavigationAgent3D 寻路（详见 §15.3）。NavAgent 用 NavMesh 给出几何精确的 path，自动绕开高墙/矮障碍/箱子——不再需要手写 A*/直线-绕路 分支判断。`_update_chase` 流程简化为：
+
+1. 有 `_has_signal_focus` 且看不到玩家 → 走 `_update_signal_focus(delta)` 追信号弹；能看到玩家时清掉 focus 转正常追。
+2. 距离 ≤ `attack_range` → 切 ATTACK。
+3. 否则 `_nav_move_toward(player.global_position, chase_speed)`：设 `agent.target_position` 并沿 `agent.get_next_path_position()` 移动。
+
+**局部避障**（`_has_obstacle_ahead` / `_get_avoidance_direction`，用 `movement_obstacle_mask = 84`）：只在 `_update_patrol` 用——巡逻路径是随机点，没有寻路保证，需要避开撞上的矮障碍/箱子/墙。
+
+**卡住恢复** `_try_stuck_recovery`（巡逻状态用）：每帧把 `global_position` 压栈到 `_last_positions[0..10]`；若头尾位移² < 0.01 就触发，随机选一个侧向 ±90° 方向跑 0.3s。
+
+⚠️ 历史教训：之前自建 A* 时，`_has_clear_line_to_player` 和「能否直线追」共用同一 mask，曾出现"视线穿过矮障碍 → 走直线追 → 物理撞矮障碍 → 又看见玩家 → 又直线追"的振荡 bug。换到 NavAgent 后，「能否直线追」直接由 NavMesh 几何回答（path 只有一段直线 = 能直追；多段 = 要绕），不再需要拆 vision/movement 两个 mask 的双重判定。
+
 ---
 
 ## 7. Container3D —— 容器搜索
@@ -584,10 +608,11 @@ Game3D 的 `_apply_location(location)` 是地图切换核心：
 | 矮障碍 (sy≤1.0) | 64 | 0 | 挡玩家/敌人，不挡子弹/视线 |
 | 地面/POI 外墙 | 4 | 0 | 同高障碍 |
 
-敌人 AI 用两套 mask 分工：
-- `vision_obstacle_mask = 4`：视线检测，只看高墙——箱子和矮障碍都不挡视线（巡逻怪能透过箱子/矮障碍发现玩家）
-- `movement_obstacle_mask = 84` (= 4+16+64)：移动/局部避障——AI 在 patrol 路径上主动绕开三类
-刷怪点地面检测 mask = `4`。
+敌人 AI 用两套 mask 分工（详见 §6.3）：
+- `vision_obstacle_mask = 4`：视线检测，只看高墙——箱子和矮障碍都不挡视线
+- `movement_obstacle_mask = 84` (= 4+16+64)：移动直达/避障/前方探障——AI 主动绕开三类
+
+NavigationMesh 资源用 `geometry_collision_mask = 84` 同步识别这三类（详见 §15.3）。刷怪点地面检测 mask = `4`。
 
 ### 15.2 Groups
 
@@ -596,6 +621,63 @@ Game3D 的 `_apply_location(location)` 是地图切换核心：
 | `player` | Player3D `_ready` 主动加入 | Enemy3D / Bullet3D / FogOfWar / HUD / Minimap |
 | `enemies` | Enemy3D `_ready` 主动加入 | NoiseManager / Bullet3D / Extraction |
 | `pickups` | ItemPickup3D | FogOfWar |
+
+### 15.3 NavigationServer3D —— NavMesh 寻路
+
+敌人寻路用 Godot 内建 `NavigationServer3D` + `NavigationRegion3D` + `NavigationAgent3D`，**不再有自建的 grid/A* 系统**。整体几何精确，没有 cell 量化误差，是行业标准做法。
+
+**整体架构：**
+
+- `expedition_map.tscn` 根节点下有一个 `NavRegion`（NavigationRegion3D）节点，配一个 `NavigationMesh` 资源（资源参数见下）。
+- 每个 `enemy_3d.tscn / patrol_enemy_3d.tscn / dormant_enemy_3d.tscn` 都有一个 `NavAgent`（NavigationAgent3D）子节点。
+- 地图加载完成（所有 POI 障碍物实例化好）后，`game_3d.gd` 调 `expedition_map.bake_navmesh(true)`：用 `NavigationServer3D.parse_source_geometry_data(navmesh, source_geom, self)` 显式从 ExpeditionMap 根节点扫描所有 sibling 子树（POI 是 NavRegion 的 sibling，不是 children），然后 `bake_from_source_geometry_data_async()` 异步烘焙。
+- 烘焙完成后 NavRegion 自动接管寻路；NavigationAgent 在 `_update_chase` / `_update_signal_focus` 内通过 `target_position = X` + `get_next_path_position()` 移动。
+
+**NavigationMesh 资源参数**（在 `expedition_map.tscn` 内 `[sub_resource NavigationMesh]`）：
+
+| 参数 | 当前值 | 含义 |
+|------|--------|------|
+| `geometry_parsed_geometry_type` | `1` (STATIC_COLLIDERS) | 从场景内的 StaticBody3D 几何解析（不是 MeshInstance） |
+| `geometry_collision_mask` | `84` (= 4+16+64) | 哪些 layer 当障碍：Obstacle + Container + LowObstacle |
+| `cell_size` | `0.25` | NavMesh 烘焙时的 voxel 边长（Recast 算法内部使用，越小越精确越慢） |
+| `cell_height` | `0.25` | NavMesh 烘焙 voxel 高度 |
+| `agent_radius` | `0.5` | 给 NavMesh 留出的 agent 半径（敌人最大 capsule radius 0.48，留 0.02m margin） |
+| `agent_height` | `1.4` | 给 NavMesh 留出的 agent 高度 |
+| `agent_max_climb` | `0.2` | agent 能"爬"的最大高差（用于跨越微小障碍，2D 平地用不到） |
+| `agent_max_slope` | `30°` | 可走斜面最大角度 |
+| `edge_max_length` | `6.0` | NavMesh 多边形单边最大长度（控制多边形细密度） |
+
+**NavigationAgent3D 参数**（在每个 enemy tscn 的 `NavAgent` 节点）：
+
+| 参数 | 当前值 | 含义 |
+|------|--------|------|
+| `path_desired_distance` | `0.6` | 当前 waypoint 到 agent 距离小于此值则切下一个 waypoint |
+| `target_desired_distance` | `1.2` | 离最终 target 多近算"到达"（`is_navigation_finished()` 返回 true） |
+| `path_max_distance` | `5.0` | path 超过这个偏离时重算 |
+| `avoidance_enabled` | `false` | RVO 多 agent 避障，目前关闭（启用后需要连 `velocity_computed` 信号） |
+| `radius` | `0.5` | agent 自身半径（用于 RVO 避障） |
+| `height` | `1.4` | agent 自身高度 |
+
+**enemy 端寻路接口** `_nav_move_toward(target_pos, speed)`（`enemy_3d.gd`）：
+
+```
+nav_agent.target_position = target_pos
+if nav_agent.is_navigation_finished():
+    velocity = 0
+else:
+    var next = nav_agent.get_next_path_position()
+    velocity = (next - global_position).normalized() * speed
+```
+
+NavAgent 内部按需重算 path（玩家移动时 target_position 变 → 自动 repath）。NavServer 的 `get_next_path_position()` 文档明确说"每物理帧调用一次是必需的"，所以这个函数在 chase/signal 状态的每帧都会被调到。
+
+**烘焙时机：**
+
+- `expedition_active` 切换（首次进入探险地图或撤离后再进入）时由 `game_3d.gd` 触发
+- 同步版本（`on_thread=false`）会卡帧 1-3 秒；默认用异步（`on_thread=true`），enemy 在 bake 完成前几秒内拿到的 path 可能是空的，会原地不动，bake 完成后自动接管。
+- ⚠️ NavMesh **不会自动重建**。如果以后加箱子破坏/障碍动态生成等需求，要在那个时机再调一次 `bake_navmesh()`。
+
+**为什么换掉自建 A\*？** 之前用 grid + 单点 box 测试 + 对角 corner cutting 防护，在边界对齐、薄障碍、Jolt contact margin 等场景反复出 bug，每次只能加 magic number 打补丁。NavMesh 用 Recast 算法生成精确的可走多边形，无 cell 量化、无 magic number，对任意形状/位置的障碍一致正确。
 
 ---
 

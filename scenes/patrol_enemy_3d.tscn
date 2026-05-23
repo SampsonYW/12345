@@ -93,3 +93,11 @@ material_override = SubResource("StandardMaterial3D_hp_back")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.01)
 mesh = SubResource("BoxMesh_hp_fill")
 material_override = SubResource("StandardMaterial3D_hp_fill")
+
+[node name="NavAgent" type="NavigationAgent3D" parent="."]
+path_desired_distance = 0.6
+target_desired_distance = 1.2
+path_max_distance = 5.0
+avoidance_enabled = false
+radius = 0.5
+height = 1.4
