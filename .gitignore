@@ -58,3 +58,14 @@ tests/*.gd.uid
 
 # VScode settings
 .vscode/settings.json
+
+# --- 其他可能的临时文件 ---
+*.zip
+*.tar.gz
+*.7z
+*.log
+*.cache
+*.bak
+*.tmp
+*.swp
+*~

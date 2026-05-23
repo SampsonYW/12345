@@ -125,6 +125,7 @@ func _run() -> void:
 		player.global_position = extraction.get_landing_position()
 		_expect(extraction.try_board(), "Player in boarding range should be able to board")
 		_expect(manager.current_state == manager.State.SUCCESS, "Boarding should complete the run")
+		await process_frame
 		_expect(
 			extraction.get_node_or_null("MothershipExtractionMarker") == null,
 			"Extraction marker should clear on terminal state"

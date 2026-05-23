@@ -3,9 +3,12 @@
 # [AI-ASSISTED] 2026-05-22 — Applied Cyber-Tactical aesthetic overhaul
 extends Control
 
-const EMPTY_SLOT_COLOR := Color(0.04, 0.05, 0.06, 0.72)
-const SLOT_BORDER_COLOR := Color(0.1, 0.3, 0.4, 0.5)
-const ACCENT_COLOR := Color(0.1, 0.85, 0.9, 1.0)
+const EMPTY_SLOT_COLOR := Color(0.1, 0.1, 0.12, 0.6)
+const SLOT_BORDER_COLOR := Color(0.3, 0.4, 0.5, 0.3)
+const ACCENT_COLOR := Color(0.4, 0.7, 0.9, 1.0)
+const SPRINT_COLOR_READY := Color(0.4, 0.7, 0.9, 1.0)
+const SPRINT_COLOR_ACTIVE := Color(0.9, 0.9, 0.95, 1.0)
+const SPRINT_COLOR_COOLDOWN := Color(0.4, 0.5, 0.6, 1.0)
 const START_KEYS := [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
 const ITEM_RELIC := preload("res://resources/items/relic_small.tres")
@@ -13,7 +16,6 @@ const ITEM_AMMO := preload("res://resources/items/standard_ammo.tres")
 const ITEM_BATTERY := preload("res://resources/items/battery_small.tres")
 const ITEM_PURIFIER := preload("res://resources/items/purifier.tres")
 const STORAGE_DRAG_SLOT_SCRIPT := preload("res://scripts/ui/storage_drag_slot.gd")
-const MINIMAP_SCRIPT := preload("res://scripts/ui/minimap.gd")
 
 # ----- Alert indicator constants (polish_plan §3) -----
 const ALERT_INDICATOR_SIZE := 32.0
@@ -41,23 +43,32 @@ var _player_health: Node = null
 var _player_shooting: Node = null
 var _inventory: Node = null
 var _extraction: Node = null
+var _player: Node = null
 var _blocked_hide_timer: float = 0.0
 var _slot_panels: Array[Panel] = []
 
-var _state_label: Label = null
-var _time_label: Label = null
-var _signal_label: Label = null
-var _main_overlay: Control = null
-var _main_prompt_label: Label = null
-var _main_summary_label: Label = null
-var _result_overlay: Control = null
-var _result_title_label: Label = null
-var _result_stats_label: Label = null
-var _prompt_label: Label = null
-var _risk_label: Label = null
-var _zone_name_label: Label = null
-var _zone_risk_label: Label = null
-var _zone_container: VBoxContainer = null
+@onready var _state_label: Label = %StateLabel
+@onready var _time_label: Label = %TimeLabel
+@onready var _signal_label: Label = %SignalLabel
+@onready var _risk_label: Label = %RiskLabel
+@onready var _zone_name_label: Label = %ZoneNameLabel
+@onready var _zone_risk_label: Label = %ZoneRiskLabel
+@onready var _zone_container: VBoxContainer = %ZoneInfo
+@onready var _minimap: Control = %Minimap
+@onready var _sprint_container: Control = %SprintUI
+@onready var _sprint_bar: ProgressBar = %SprintBar
+@onready var _sprint_label: Label = %SprintLabel
+@onready var _sprint_status_label: Label = %SprintStatus
+@onready var _prompt_label: Label = %PromptLabel
+@onready var _hold_progress_container: Control = %HoldProgress
+@onready var _hold_progress_fill: ColorRect = %HoldProgress/Fill
+@onready var _hold_progress_label: Label = %HoldProgress/Label
+@onready var _main_overlay: Control = %MainOverlay
+@onready var _main_prompt_label: Label = %MainPromptLabel
+@onready var _main_summary_label: Label = %MainSummaryLabel
+@onready var _result_overlay: Control = %ResultOverlay
+@onready var _result_title_label: Label = %ResultTitleLabel
+@onready var _result_stats_label: Label = %ResultStatsLabel
 var _backpack_overlay: Control = null
 var _storage_overlay: Control = null
 var _search_overlay: Control = null
@@ -66,10 +77,6 @@ var _search_container: Node = null
 var _search_active_index: int = -1
 var _search_feedback_label: Label = null
 var _search_entry_snapshot: Array = []
-var _minimap: Control = null
-var _hold_progress_container: Control = null
-var _hold_progress_fill: ColorRect = null
-var _hold_progress_label: Label = null
 var _spawn_manager: Node = null
 var _alert_indicators: Array[Dictionary] = []  # [{screen_pos, opacity, direction}]
 var _spawn_pulses: Array[Dictionary] = []  # [{screen_pos, remaining, max_time, direction}]
@@ -91,8 +98,8 @@ var _warehouse_items := {
 	"残响碎片": ITEM_RELIC,
 }
 
-@onready var top_left: VBoxContainer = $TopLeft
-@onready var top_right: VBoxContainer = $TopRight
+@onready var top_left: VBoxContainer = %TopLeft
+@onready var top_right: VBoxContainer = %TopRight
 @onready var hp_bar: ProgressBar = %HPBar
 @onready var hp_label: Label = %HPLabel
 @onready var erosion_bar: ProgressBar = %ErosionBar
@@ -108,12 +115,6 @@ var _warehouse_items := {
 func _ready() -> void:
 	blocked_label.visible = false
 	slots_container.visible = false
-	_build_status_labels()
-	_build_minimap()
-	_build_slot_panels()
-	_build_prompt_labels()
-	_build_main_overlay()
-	_build_result_overlay()
 	_bind_player_refs()
 	_bind_extraction_ref()
 
@@ -126,8 +127,18 @@ func _ready() -> void:
 	_on_state_changed(GameManager.current_state)
 	_update_time_label()
 	_update_signal_label()
-	_apply_cyber_tactical_theme()
+	_apply_soft_ui_theme()
+	_style_sprint_bar()
+	_main_overlay.gui_input.connect(_on_main_overlay_gui_input)
+	%MainOverlay/Content/StartButton.pressed.connect(_on_title_clicked)
+	%ResultOverlay/Content/ReturnButton.pressed.connect(_return_to_home_from_result)
 	call_deferred("_restore_launch_screen")
+
+	# Collect slot panels from BottomBar children
+	_slot_panels = []
+	for child in slots_container.get_children():
+		if child is Panel:
+			_slot_panels.append(child)
 
 
 func _process(delta: float) -> void:
@@ -143,6 +154,7 @@ func _process(delta: float) -> void:
 	_process_container_search(delta)
 	_update_time_label()
 	_update_signal_label()
+	_update_sprint_ui()
 	_update_alert_indicators(delta)
 	_update_spawn_pulses(delta)
 	queue_redraw()
@@ -192,331 +204,52 @@ func _mark_input_as_handled() -> void:
 		viewport.set_input_as_handled()
 
 
-func _apply_cyber_tactical_theme() -> void:
-	# Create backing panels for TopLeft and TopRight
-	var tl_panel := PanelContainer.new()
-	tl_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tl_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	tl_panel.offset_left = 24
-	tl_panel.offset_top = 24
-	var tl_style := _make_panel_style(Color(0.03, 0.04, 0.05, 0.85))
-	tl_style.border_width_left = 3
-	tl_style.border_color = ACCENT_COLOR
-	tl_panel.add_theme_stylebox_override("panel", tl_style)
-	remove_child(top_left)
-	add_child(tl_panel)
-	tl_panel.add_child(top_left)
-
-	var tr_panel := PanelContainer.new()
-	tr_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tr_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	tr_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	tr_panel.offset_right = -24
-	tr_panel.offset_top = 24
-	var tr_style := _make_panel_style(Color(0.03, 0.04, 0.05, 0.85))
-	tr_style.border_width_right = 3
-	tr_style.border_color = Color(0.9, 0.5, 0.1, 0.8) # Orange accent for info
-	tr_panel.add_theme_stylebox_override("panel", tr_style)
-	remove_child(top_right)
-	top_right.custom_minimum_size = Vector2(160, 0)
-	add_child(tr_panel)
-	tr_panel.add_child(top_right)
+func _apply_soft_ui_theme() -> void:
 
 	# Style ProgressBars
-	_style_progress_bar(hp_bar, Color(0.2, 0.8, 0.4, 1.0))
-	_style_progress_bar(erosion_bar, Color(0.8, 0.3, 0.8, 1.0))
+	_style_progress_bar(hp_bar, Color(0.4, 0.8, 0.5, 1.0))
+	_style_progress_bar(erosion_bar, Color(0.7, 0.5, 0.8, 1.0))
 
 	# Clean up Labels with subtle shadow
 	for child in top_left.get_children() + top_right.get_children():
 		if child is Label:
-			child.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+			child.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.3))
 			child.add_theme_constant_override("shadow_offset_x", 1)
 			child.add_theme_constant_override("shadow_offset_y", 1)
 
 
 func _style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.0, 0.0, 0.0, 0.5)
-	bg.set_corner_radius_all(2)
+	bg.bg_color = Color(0.1, 0.1, 0.12, 0.5)
+	bg.set_corner_radius_all(6)
 	bar.add_theme_stylebox_override("background", bg)
 	var fg := StyleBoxFlat.new()
 	fg.bg_color = fill_color
-	fg.set_corner_radius_all(2)
+	fg.set_corner_radius_all(6)
 	bar.add_theme_stylebox_override("fill", fg)
 
 
-func _build_status_labels() -> void:
-	_state_label = _make_status_label("状态  准备中")
-	_time_label = _make_status_label("时间  00:00")
-	_signal_label = _make_status_label("信号  就绪")
-	_risk_label = _make_status_label("风险  标题")
-	top_right.add_child(_state_label)
-	top_right.add_child(_time_label)
-	top_right.add_child(_signal_label)
-	top_right.add_child(_risk_label)
-
-	# Zone info panel (top-left, below existing stats)
-	var zone_spacer := Control.new()
-	zone_spacer.custom_minimum_size = Vector2(0, 10)
-	zone_spacer.name = "ZoneSpacer"
-	top_left.add_child(zone_spacer)
-
-	_zone_container = VBoxContainer.new()
-	_zone_container.name = "ZoneInfo"
-	_zone_container.visible = false
-	top_left.add_child(_zone_container)
-
-	_zone_name_label = Label.new()
-	_zone_name_label.name = "ZoneNameLabel"
-	_zone_name_label.text = ""
-	_zone_name_label.add_theme_font_size_override("font_size", 24)
-	_zone_container.add_child(_zone_name_label)
-
-	_zone_risk_label = Label.new()
-	_zone_risk_label.name = "ZoneRiskLabel"
-	_zone_risk_label.text = ""
-	_zone_risk_label.add_theme_font_size_override("font_size", 20)
-	_zone_container.add_child(_zone_risk_label)
+func _style_sprint_bar() -> void:
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.1, 0.1, 0.12, 0.6)
+	bg.set_corner_radius_all(6)
+	_sprint_bar.add_theme_stylebox_override("background", bg)
+	var fg := StyleBoxFlat.new()
+	fg.bg_color = SPRINT_COLOR_READY
+	fg.set_corner_radius_all(6)
+	fg.shadow_color = SPRINT_COLOR_READY * Color(1.0, 1.0, 1.0, 0.2)
+	fg.shadow_size = 6
+	_sprint_bar.add_theme_stylebox_override("fill", fg)
 
 
-func _build_prompt_labels() -> void:
-	_prompt_label = Label.new()
-	_prompt_label.name = "PromptLabel"
-	_prompt_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_prompt_label.anchor_left = 0.5
-	_prompt_label.anchor_top = 1.0
-	_prompt_label.anchor_right = 0.5
-	_prompt_label.anchor_bottom = 1.0
-	_prompt_label.offset_left = -360.0
-	_prompt_label.offset_top = -150.0
-	_prompt_label.offset_right = 360.0
-	_prompt_label.offset_bottom = -116.0
-	_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_prompt_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_prompt_label.add_theme_font_size_override("font_size", 24)
-	_prompt_label.add_theme_color_override("font_color", Color(0.92, 0.98, 0.94, 1.0))
-	add_child(_prompt_label)
-	_build_hold_progress()
 
-
-func _build_minimap() -> void:
-	_minimap = Control.new()
-	_minimap.name = "Minimap"
-	_minimap.set_script(MINIMAP_SCRIPT)
-	_minimap.anchor_left = 0.0
-	_minimap.anchor_top = 1.0
-	_minimap.anchor_right = 0.0
-	_minimap.anchor_bottom = 1.0
-	_minimap.offset_left = 20.0
-	_minimap.offset_top = -150.0
-	_minimap.offset_right = 260.0
-	_minimap.offset_bottom = -30.0
-	_minimap.visible = false
-	_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_minimap)
-
-
-func _build_hold_progress() -> void:
-	# Container: centered bottom, above PromptLabel
-	_hold_progress_container = Control.new()
-	_hold_progress_container.name = "HoldProgress"
-	_hold_progress_container.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_hold_progress_container.anchor_left = 0.5
-	_hold_progress_container.anchor_top = 1.0
-	_hold_progress_container.anchor_right = 0.5
-	_hold_progress_container.anchor_bottom = 1.0
-	_hold_progress_container.offset_left = -140.0
-	_hold_progress_container.offset_top = -100.0
-	_hold_progress_container.offset_right = 140.0
-	_hold_progress_container.offset_bottom = -68.0
-	_hold_progress_container.visible = false
-	_hold_progress_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_hold_progress_container)
-
-	# Background bar
-	var bg := ColorRect.new()
-	bg.name = "BG"
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.color = Color(0.08, 0.08, 0.08, 0.75)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hold_progress_container.add_child(bg)
-
-	# Fill bar
-	_hold_progress_fill = ColorRect.new()
-	_hold_progress_fill.name = "Fill"
-	_hold_progress_fill.anchor_left = 0.0
-	_hold_progress_fill.anchor_top = 0.0
-	_hold_progress_fill.anchor_right = 0.0
-	_hold_progress_fill.anchor_bottom = 1.0
-	_hold_progress_fill.offset_left = 2.0
-	_hold_progress_fill.offset_top = 2.0
-	_hold_progress_fill.offset_right = 2.0
-	_hold_progress_fill.offset_bottom = -2.0
-	_hold_progress_fill.color = Color(0.38, 0.78, 1.0, 0.9)
-	_hold_progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hold_progress_container.add_child(_hold_progress_fill)
-
-	# Label overlay
-	_hold_progress_label = Label.new()
-	_hold_progress_label.name = "Label"
-	_hold_progress_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_hold_progress_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hold_progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_hold_progress_label.add_theme_font_size_override("font_size", 20)
-	_hold_progress_label.add_theme_color_override("font_color", Color(0.96, 0.96, 0.96, 1.0))
-	_hold_progress_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hold_progress_container.add_child(_hold_progress_label)
-
-
-func _build_slot_panels() -> void:
-	for i in 8:
-		var panel := Panel.new()
-		panel.custom_minimum_size = Vector2(80, 80)
-		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-		var fill := ColorRect.new()
-		fill.name = "Fill"
-		fill.set_anchors_preset(Control.PRESET_FULL_RECT)
-		fill.offset_left = 2.0
-		fill.offset_top = 2.0
-		fill.offset_right = -2.0
-		fill.offset_bottom = -2.0
-		fill.color = EMPTY_SLOT_COLOR
-		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(fill)
-
-		var border := ReferenceRect.new()
-		border.set_anchors_preset(Control.PRESET_FULL_RECT)
-		border.border_color = SLOT_BORDER_COLOR
-		border.border_width = 1.0
-		border.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(border)
-
-		var num := Label.new()
-		num.name = "Num"
-		num.text = str(i + 1)
-		num.position = Vector2(6.0, 2.0)
-		num.add_theme_color_override("font_color", Color(1, 1, 1, 0.86))
-		num.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(num)
-
-		var name_label := Label.new()
-		name_label.name = "ItemName"
-		name_label.position = Vector2(6.0, 36.0)
-		name_label.size = Vector2(48.0, 20.0)
-		name_label.clip_text = true
-		name_label.add_theme_font_size_override("font_size", 18)
-		name_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.92))
-		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(name_label)
-
-		slots_container.add_child(panel)
-		_slot_panels.append(panel)
-
-
-func _build_main_overlay() -> void:
-	_main_overlay = ColorRect.new()
-	_main_overlay.name = "MainOverlay"
-	_main_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_main_overlay.color = Color(0.02, 0.03, 0.04, 0.94) # Darker cyber blue
-	_main_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_main_overlay.gui_input.connect(_on_main_overlay_gui_input)
-	add_child(_main_overlay)
-
-	var content := VBoxContainer.new()
-	content.set_anchors_preset(Control.PRESET_CENTER)
-	content.offset_left = -240.0
-	content.offset_top = -120.0
-	content.offset_right = 240.0
-	content.offset_bottom = 120.0
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 18)
-	_main_overlay.add_child(content)
-
-	var title := Label.new()
-	title.text = "余晖号"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 42)
-	title.add_theme_color_override("font_color", Color(0.96, 0.92, 0.78, 1.0))
-	content.add_child(title)
-
-	_main_prompt_label = Label.new()
-	_main_prompt_label.text = "点击任意位置开始"
-	_main_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_main_prompt_label.add_theme_font_size_override("font_size", 24)
-	_main_prompt_label.add_theme_color_override("font_color", Color(0.78, 0.86, 0.82, 1.0))
-	content.add_child(_main_prompt_label)
-
-	_main_summary_label = Label.new()
-	_main_summary_label.visible = false
-	_main_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_main_summary_label.add_theme_font_size_override("font_size", 20)
-	_main_summary_label.add_theme_color_override("font_color", Color(0.90, 0.96, 0.92, 1.0))
-	content.add_child(_main_summary_label)
-
-	var button := Button.new()
-	button.text = "开始"
-	button.custom_minimum_size = Vector2(180.0, 42.0)
-	button.pressed.connect(_on_title_clicked)
-	content.add_child(button)
-
-
-func _build_result_overlay() -> void:
-	_result_overlay = ColorRect.new()
-	_result_overlay.name = "ResultOverlay"
-	_result_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_result_overlay.color = Color(0.02, 0.025, 0.025, 0.88)
-	_result_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	_result_overlay.visible = false
-	add_child(_result_overlay)
-
-	var content := VBoxContainer.new()
-	content.set_anchors_preset(Control.PRESET_CENTER)
-	content.offset_left = -280.0
-	content.offset_top = -150.0
-	content.offset_right = 280.0
-	content.offset_bottom = 150.0
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 16)
-	_result_overlay.add_child(content)
-
-	_result_title_label = Label.new()
-	_result_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_result_title_label.add_theme_font_size_override("font_size", 42)
-	_result_title_label.add_theme_color_override("font_color", Color(0.98, 0.92, 0.74, 1.0))
-	content.add_child(_result_title_label)
-
-	_result_stats_label = Label.new()
-	_result_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_result_stats_label.add_theme_font_size_override("font_size", 22)
-	_result_stats_label.add_theme_color_override("font_color", Color(0.90, 0.96, 0.92, 1.0))
-	content.add_child(_result_stats_label)
-
-	var prompt := Label.new()
-	prompt.text = "按回车或空格返回余晖号"
-	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	prompt.add_theme_color_override("font_color", Color(0.76, 0.84, 0.80, 1.0))
-	content.add_child(prompt)
-
-	var button := Button.new()
-	button.text = "返回余晖号"
-	button.custom_minimum_size = Vector2(180.0, 42.0)
-	button.pressed.connect(_return_to_home_from_result)
-	content.add_child(button)
-
-
-func _make_status_label(text: String) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	label.add_theme_font_size_override("font_size", 24)
-	return label
 
 
 func _bind_player_refs() -> void:
 	var player: Node = get_tree().get_first_node_in_group("player")
 	if player == null:
 		return
+	_player = player
 	if _player_health == null:
 		_player_health = player.get_node_or_null("PlayerHealth")
 		if _player_health != null:
@@ -1250,9 +983,9 @@ func _set_search_feedback(text: String) -> void:
 func _make_panel_style(bg_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg_color
-	style.border_color = Color(0.1, 0.4, 0.5, 0.6)
+	style.border_color = Color(0.3, 0.4, 0.5, 0.2)
 	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
+	style.set_corner_radius_all(12)
 	style.content_margin_left = 16.0
 	style.content_margin_right = 16.0
 	style.content_margin_top = 16.0
@@ -1388,9 +1121,11 @@ func _set_run_hud_visible(is_show: bool) -> void:
 	slots_container.visible = false
 	if _prompt_label != null:
 		_prompt_label.visible = false
+	var show_expedition_ui := is_show and GameManager.current_location == GameManager.Location.EXPEDITION
 	if _minimap != null:
-		var is_expedition := GameManager.current_location == GameManager.Location.EXPEDITION
-		_minimap.visible = is_show and is_expedition
+		_minimap.visible = show_expedition_ui
+	if _sprint_container != null:
+		_sprint_container.visible = show_expedition_ui
 	blocked_label.visible = is_show and blocked_label.visible
 
 
@@ -1491,18 +1226,24 @@ func _on_location_changed(location: int) -> void:
 			_zone_container.visible = false
 		if _minimap != null:
 			_minimap.visible = false
+		if _sprint_container != null:
+			_sprint_container.visible = false
 	elif location == GameManager.Location.AFTERGLOW:
 		set_risk_label_text("余晖号")
 		if _zone_container != null:
 			_zone_container.visible = false
 		if _minimap != null:
 			_minimap.visible = false
+		if _sprint_container != null:
+			_sprint_container.visible = false
 	elif location == GameManager.Location.EXPEDITION:
 		set_risk_label_text("风险  低风险")
 		if _zone_container != null:
 			_zone_container.visible = true
 		if _minimap != null:
 			_minimap.visible = true
+		if _sprint_container != null:
+			_sprint_container.visible = true
 
 
 func _update_time_label() -> void:
@@ -1524,6 +1265,49 @@ func _update_signal_label() -> void:
 		_signal_label.text = "信号  %s" % _extraction.get_status_text()
 	else:
 		_signal_label.text = "信号  已发射"
+
+
+func _update_sprint_ui() -> void:
+	if _sprint_bar == null or _sprint_status_label == null:
+		return
+	if _player == null or not is_instance_valid(_player):
+		_player = get_tree().get_first_node_in_group("player")
+	if _player == null:
+		return
+	if not _player.has_method("is_sprinting") or not _player.has_method("get_sprint_cooldown_ratio"):
+		return
+
+	var is_sprinting: bool = _player.is_sprinting()
+	var cooldown_ratio: float = _player.get_sprint_cooldown_ratio()
+	var duration_ratio: float = 0.0
+	if _player.has_method("get_sprint_duration_ratio"):
+		duration_ratio = _player.get_sprint_duration_ratio()
+
+	var fg := _sprint_bar.get_theme_stylebox("fill") as StyleBoxFlat
+	if fg == null:
+		fg = StyleBoxFlat.new()
+		fg.set_corner_radius_all(6)
+		_sprint_bar.add_theme_stylebox_override("fill", fg)
+
+	if is_sprinting:
+		_sprint_bar.value = duration_ratio * 100.0
+		_sprint_status_label.text = "激活"
+		_sprint_status_label.add_theme_color_override("font_color", SPRINT_COLOR_ACTIVE)
+		fg.bg_color = SPRINT_COLOR_ACTIVE
+		fg.shadow_color = SPRINT_COLOR_ACTIVE * Color(1.0, 1.0, 1.0, 0.2)
+	elif cooldown_ratio > 0.0:
+		var fill_ratio := 1.0 - cooldown_ratio
+		_sprint_bar.value = fill_ratio * 100.0
+		_sprint_status_label.text = "恢复中 %d%%" % int(round(fill_ratio * 100.0))
+		_sprint_status_label.add_theme_color_override("font_color", SPRINT_COLOR_COOLDOWN)
+		fg.bg_color = SPRINT_COLOR_COOLDOWN
+		fg.shadow_color = Color(0, 0, 0, 0)
+	else:
+		_sprint_bar.value = 100.0
+		_sprint_status_label.text = "就绪"
+		_sprint_status_label.add_theme_color_override("font_color", SPRINT_COLOR_READY)
+		fg.bg_color = SPRINT_COLOR_READY
+		fg.shadow_color = SPRINT_COLOR_READY * Color(1.0, 1.0, 1.0, 0.2)
 
 
 func _update_end_flow(state: int) -> void:

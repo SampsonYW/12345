@@ -164,7 +164,5 @@ func _notify_enemies_of_signal(origin: Vector3) -> void:
 
 func _clear_marker() -> void:
 	if _marker != null and is_instance_valid(_marker):
-		if _marker.get_parent() != null:
-			_marker.get_parent().remove_child(_marker)
-		_marker.free()
+		_marker.queue_free()
 	_marker = null

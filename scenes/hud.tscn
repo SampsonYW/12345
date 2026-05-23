@@ -1,6 +1,23 @@
-[gd_scene load_steps=2 format=3 uid="uid://bhud0000001"]
+[gd_scene load_steps=4 format=3 uid="uid://bhud0000001"]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://scripts/ui/minimap.gd" id="2_minimap"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_soft"]
+content_margin_left = 20.0
+content_margin_top = 16.0
+content_margin_right = 20.0
+content_margin_bottom = 16.0
+bg_color = Color(0.1, 0.1, 0.12, 0.6)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.4, 0.5, 0.2)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [node name="HUD" type="Control"]
 layout_mode = 3
@@ -10,20 +27,26 @@ anchor_bottom = 1.0
 mouse_filter = 2
 script = ExtResource("1_hud")
 
-[node name="TopLeft" type="VBoxContainer" parent="."]
+[node name="TopLeftPanel" type="PanelContainer" parent="."]
 layout_mode = 1
-offset_left = 20.0
-offset_top = 20.0
-offset_right = 260.0
-offset_bottom = 200.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 264.0
+offset_bottom = 204.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_soft")
+
+[node name="TopLeft" type="VBoxContainer" parent="TopLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
 mouse_filter = 2
 
-[node name="HPLabel" type="Label" parent="TopLeft"]
+[node name="HPLabel" type="Label" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "生命  100 / 100"
 
-[node name="HPBar" type="ProgressBar" parent="TopLeft"]
+[node name="HPBar" type="ProgressBar" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 16)
 layout_mode = 2
@@ -31,17 +54,17 @@ max_value = 100.0
 value = 100.0
 show_percentage = false
 
-[node name="Spacer1" type="Control" parent="TopLeft"]
+[node name="Spacer1" type="Control" parent="TopLeftPanel/TopLeft"]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="ErosionLabel" type="Label" parent="TopLeft"]
+[node name="ErosionLabel" type="Label" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "侵蚀  0%"
 
-[node name="ErosionBar" type="ProgressBar" parent="TopLeft"]
+[node name="ErosionBar" type="ProgressBar" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 16)
 layout_mode = 2
@@ -49,39 +72,96 @@ max_value = 100.0
 value = 0.0
 show_percentage = false
 
-[node name="Spacer2" type="Control" parent="TopLeft"]
+[node name="Spacer2" type="Control" parent="TopLeftPanel/TopLeft"]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="WeightLabel" type="Label" parent="TopLeft"]
+[node name="WeightLabel" type="Label" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "负重  0 / 50"
 
-[node name="TopRight" type="VBoxContainer" parent="."]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -260.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = 160.0
+[node name="ZoneSpacer" type="Control" parent="TopLeftPanel/TopLeft"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
 mouse_filter = 2
 
-[node name="AmmoLabel" type="Label" parent="TopRight"]
+[node name="ZoneInfo" type="VBoxContainer" parent="TopLeftPanel/TopLeft"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ZoneNameLabel" type="Label" parent="TopLeftPanel/TopLeft/ZoneInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="ZoneRiskLabel" type="Label" parent="TopLeftPanel/TopLeft/ZoneInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+
+[node name="TopRightPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -216.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = 200.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_soft")
+
+[node name="TopRight" type="VBoxContainer" parent="TopRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="StateLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "状态  准备中"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="TimeLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "时间  00:00"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="SignalLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "信号  就绪"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="RiskLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "风险  标题"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="AmmoLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "弹药  60 / 60"
 horizontal_alignment = 2
 
-[node name="ScoreLabel" type="Label" parent="TopRight"]
+[node name="ScoreLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "分数  0"
 horizontal_alignment = 2
 
-[node name="CollectibleLabel" type="Label" parent="TopRight"]
+[node name="CollectibleLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "收集品  0"
@@ -103,6 +183,382 @@ grow_vertical = 0
 theme_override_constants/separation = 4
 mouse_filter = 2
 
+[node name="Slot0" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot0"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot0"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot0"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "1"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot0"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
+[node name="Slot1" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot1"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot1"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "2"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot1"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
+[node name="Slot2" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot2"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot2"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "3"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot2"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
+[node name="Slot3" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot3"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot3"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "4"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot3"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
+[node name="Slot4" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot4"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot4"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot4"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "5"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot4"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
+[node name="Slot5" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot5"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot5"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot5"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "6"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot5"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
+[node name="Slot6" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot6"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot6"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot6"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "7"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot6"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
+[node name="Slot7" type="Panel" parent="BottomBar"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="BottomBar/Slot7"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+color = Color(0.1, 0.1, 0.12, 0.6)
+mouse_filter = 2
+
+[node name="Border" type="ReferenceRect" parent="BottomBar/Slot7"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+border_color = Color(0.3, 0.4, 0.5, 0.3)
+border_width = 1
+mouse_filter = 2
+
+[node name="Num" type="Label" parent="BottomBar/Slot7"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 2.0
+offset_right = 6.0
+offset_bottom = 2.0
+text = "8"
+theme_override_colors/font_color = Color(1, 1, 1, 0.86)
+mouse_filter = 2
+
+[node name="ItemName" type="Label" parent="BottomBar/Slot7"]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 36.0
+offset_right = 54.0
+offset_bottom = 56.0
+clip_text = true
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+mouse_filter = 2
+
 [node name="BlockedLabel" type="Label" parent="."]
 unique_name_in_owner = true
 layout_mode = 1
@@ -120,3 +576,243 @@ grow_vertical = 2
 horizontal_alignment = 1
 vertical_alignment = 1
 text = ""
+
+[node name="Minimap" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 12
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -150.0
+offset_right = 260.0
+offset_bottom = -30.0
+grow_vertical = 0
+mouse_filter = 2
+visible = false
+script = ExtResource("2_minimap")
+
+[node name="SprintUI" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 12
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -210.0
+offset_right = 264.0
+offset_bottom = -160.0
+grow_vertical = 0
+mouse_filter = 2
+visible = false
+theme_override_constants/separation = 6
+
+[node name="SprintHeader" type="HBoxContainer" parent="SprintUI"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SprintLabel" type="Label" parent="SprintUI/SprintHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "冲刺 [Shift]"
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1.0)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.3)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+
+[node name="Spacer" type="Control" parent="SprintUI/SprintHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="SprintStatus" type="Label" parent="SprintUI/SprintHeader"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "就绪"
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.4, 0.7, 0.9, 1.0)
+
+[node name="SprintBar" type="ProgressBar" parent="SprintUI"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 10)
+layout_mode = 2
+max_value = 100.0
+value = 100.0
+show_percentage = false
+
+[node name="PromptLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 9
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -360.0
+offset_top = -150.0
+offset_right = 360.0
+offset_bottom = -116.0
+grow_horizontal = 2
+grow_vertical = 0
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.92, 0.98, 0.94, 1.0)
+
+[node name="HoldProgress" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 9
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -140.0
+offset_top = -100.0
+offset_right = 140.0
+offset_bottom = -68.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+visible = false
+
+[node name="BG" type="ColorRect" parent="HoldProgress"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.08, 0.08, 0.75)
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="HoldProgress"]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 2.0
+offset_bottom = -2.0
+color = Color(0.38, 0.78, 1.0, 0.9)
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="HoldProgress"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.96, 0.96, 0.96, 1.0)
+mouse_filter = 2
+
+[node name="MainOverlay" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.03, 0.04, 0.94)
+mouse_filter = 1
+
+[node name="Content" type="VBoxContainer" parent="MainOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -120.0
+offset_right = 240.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+theme_override_constants/separation = 18
+
+[node name="TitleLabel" type="Label" parent="MainOverlay/Content"]
+layout_mode = 2
+text = "余晖号"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 42
+theme_override_colors/font_color = Color(0.96, 0.92, 0.78, 1.0)
+
+[node name="MainPromptLabel" type="Label" parent="MainOverlay/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "点击任意位置开始"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(0.78, 0.86, 0.82, 1.0)
+
+[node name="MainSummaryLabel" type="Label" parent="MainOverlay/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+visible = false
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.90, 0.96, 0.92, 1.0)
+
+[node name="StartButton" type="Button" parent="MainOverlay/Content"]
+layout_mode = 2
+text = "开始"
+custom_minimum_size = Vector2(180, 42)
+
+[node name="ResultOverlay" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.02, 0.025, 0.025, 0.88)
+mouse_filter = 1
+visible = false
+
+[node name="Content" type="VBoxContainer" parent="ResultOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -150.0
+offset_right = 280.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+theme_override_constants/separation = 16
+
+[node name="ResultTitleLabel" type="Label" parent="ResultOverlay/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 42
+theme_override_colors/font_color = Color(0.98, 0.92, 0.74, 1.0)
+
+[node name="ResultStatsLabel" type="Label" parent="ResultOverlay/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.90, 0.96, 0.92, 1.0)
+
+[node name="PromptLabel" type="Label" parent="ResultOverlay/Content"]
+layout_mode = 2
+text = "按回车或空格返回余晖号"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.76, 0.84, 0.80, 1.0)
+
+[node name="ReturnButton" type="Button" parent="ResultOverlay/Content"]
+layout_mode = 2
+text = "返回余晖号"
+custom_minimum_size = Vector2(180, 42)

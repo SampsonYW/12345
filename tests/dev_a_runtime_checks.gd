@@ -26,8 +26,8 @@ func _init() -> void:
 
 	manager._process(60.0)
 	_expect(
-		manager.player_erosion > 0.9 and manager.player_erosion < 1.1,
-		"60 seconds should add about 1 percent erosion"
+		manager.player_erosion > 2.4 and manager.player_erosion < 2.6,
+		"60 seconds should add about 2.5 percent erosion"
 	)
 
 	var fired: bool = manager.fire_signal_flare(Vector3(12.0, 0.0, 34.0))

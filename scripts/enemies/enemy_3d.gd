@@ -79,6 +79,7 @@ func _process(delta: float) -> void:
 	if not _is_awake and _current_alert > 0.0:
 		_current_alert = maxf(0.0, _current_alert - decay_rate * delta)
 		_update_alert_bar()
+	_billboard_bars()
 
 
 func _physics_process(delta: float) -> void:
@@ -577,6 +578,23 @@ func _update_hp_bar() -> void:
 		return
 	_hp_bar_fill.scale.x = ratio
 	_hp_bar_fill.position.x = -HP_BAR_WIDTH * (1.0 - ratio) * 0.5
+
+
+## 让血条和警戒条始终面向摄像机（billboard 效果）
+func _billboard_bars() -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var cam_pos := cam.global_position
+	for bar in [_alert_bar, _hp_bar]:
+		if bar == null or not is_instance_valid(bar):
+			continue
+		var node: Node3D = bar as Node3D
+		var bar_pos: Vector3 = node.global_position
+		var dir: Vector3 = cam_pos - bar_pos
+		dir.y = 0.0
+		if dir.length_squared() > 0.01:
+			node.look_at(bar_pos + dir, Vector3.UP)
 
 
 func _die() -> void:
