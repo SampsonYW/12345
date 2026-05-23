@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://player3d00001"]
+[gd_scene load_steps=13 format=3 uid="uid://player3d00001"]
 
 [ext_resource type="Script" path="res://scripts/player/player_3d.gd" id="1_player3d"]
 [ext_resource type="Script" path="res://scripts/player/player_shooting_3d.gd" id="2_shooting3d"]
@@ -18,6 +18,22 @@ height = 1.45
 albedo_color = Color(0.24, 0.74, 0.5, 1)
 roughness = 0.7
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_debug_arrow"]
+albedo_color = Color(1.0, 0.15, 0.15, 1)
+emission_enabled = true
+emission = Color(1.0, 0.15, 0.15, 1)
+emission_energy_multiplier = 2.0
+shading_mode = 0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_debug_shaft"]
+top_radius = 0.04
+bottom_radius = 0.04
+height = 0.6
+radial_segments = 8
+
+[sub_resource type="PrismMesh" id="PrismMesh_debug_head"]
+size = Vector3(0.2, 0.3, 0.2)
+
 [node name="Player3D" type="CharacterBody3D" groups=["player"]]
 collision_layer = 1
 collision_mask = 22
@@ -31,6 +47,19 @@ shape = SubResource("CapsuleShape3D_player")
 position = Vector3(0, 0.82, 0)
 mesh = SubResource("CapsuleMesh_player")
 material_override = SubResource("StandardMaterial3D_player")
+
+[node name="DebugDirectionArrow" type="Node3D" parent="."]
+position = Vector3(0, 1.6, 0)
+
+[node name="Shaft" type="MeshInstance3D" parent="DebugDirectionArrow"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, -0.3)
+mesh = SubResource("CylinderMesh_debug_shaft")
+material_override = SubResource("StandardMaterial3D_debug_arrow")
+
+[node name="Head" type="MeshInstance3D" parent="DebugDirectionArrow"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, -0.75)
+mesh = SubResource("PrismMesh_debug_head")
+material_override = SubResource("StandardMaterial3D_debug_arrow")
 
 [node name="GunPivot" type="Node3D" parent="."]
 

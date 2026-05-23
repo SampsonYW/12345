@@ -1,0 +1,35 @@
+[gd_scene format=3 uid="uid://4one33gvfeb5"]
+
+[ext_resource type="Script" uid="uid://c7jsnh736nn3o" path="res://scripts/maps/expedition_map.gd" id="6_script"]
+
+[sub_resource type="StandardMaterial3D" id="mat_ground"]
+albedo_color = Color(0.13, 0.18, 0.13, 1)
+
+[sub_resource type="BoxMesh" id="mesh_ground"]
+material = SubResource("mat_ground")
+size = Vector3(600, 0.1, 350)
+
+[sub_resource type="BoxShape3D" id="shape_ground"]
+size = Vector3(600, 0.1, 350)
+
+[node name="ExpeditionMap" type="Node3D" unique_id=1206466896]
+script = ExtResource("6_script")
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1415156840]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+collision_layer = 4
+collision_mask = 0
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground" unique_id=758928406]
+mesh = SubResource("mesh_ground")
+
+[node name="GroundShape" type="CollisionShape3D" parent="Ground" unique_id=689856346]
+shape = SubResource("shape_ground")
+
+[node name="RiskZones" type="Node3D" parent="." unique_id=535903988]
+
+[node name="Obstacles" type="Node3D" parent="." unique_id=947530289]
+
+[node name="Containers" type="Node3D" parent="." unique_id=436963251]
+
+[node name="InitialSpawns" type="Node3D" parent="." unique_id=124584451]

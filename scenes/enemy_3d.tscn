@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://enemy3d000001"]
+[gd_scene load_steps=13 format=3 uid="uid://enemy3d000001"]
 
 [ext_resource type="Script" path="res://scripts/enemies/enemy_3d.gd" id="1_enemy3d"]
 
@@ -14,6 +14,42 @@ height = 1.25
 albedo_color = Color(0.8, 0.22, 0.22, 1)
 roughness = 0.74
 
+[sub_resource type="BoxMesh" id="BoxMesh_alert_back"]
+size = Vector3(1, 0.08, 0.04)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_alert_back"]
+albedo_color = Color(0.04, 0.05, 0.05, 0.9)
+roughness = 0.5
+transparency = 1
+
+[sub_resource type="BoxMesh" id="BoxMesh_alert_fill"]
+size = Vector3(1, 0.052, 0.048)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_alert_fill"]
+albedo_color = Color(1, 0.65, 0.12, 1)
+roughness = 0.5
+emission_enabled = true
+emission = Color(1, 0.35, 0.05, 1)
+emission_energy_multiplier = 0.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_hp_back"]
+size = Vector3(1, 0.08, 0.04)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hp_back"]
+albedo_color = Color(0.04, 0.04, 0.04, 0.9)
+roughness = 0.5
+transparency = 1
+
+[sub_resource type="BoxMesh" id="BoxMesh_hp_fill"]
+size = Vector3(1, 0.052, 0.048)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hp_fill"]
+albedo_color = Color(0.95, 0.08, 0.05, 1)
+roughness = 0.5
+emission_enabled = true
+emission = Color(1, 0.04, 0.02, 1)
+emission_energy_multiplier = 0.65
+
 [node name="Enemy3D" type="CharacterBody3D" groups=["enemies"]]
 collision_layer = 2
 collision_mask = 5
@@ -27,3 +63,27 @@ shape = SubResource("CapsuleShape3D_enemy")
 position = Vector3(0, 0.72, 0)
 mesh = SubResource("CapsuleMesh_enemy")
 material_override = SubResource("StandardMaterial3D_enemy")
+
+[node name="AlertBar" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
+
+[node name="AlertBack" type="MeshInstance3D" parent="AlertBar"]
+mesh = SubResource("BoxMesh_alert_back")
+material_override = SubResource("StandardMaterial3D_alert_back")
+
+[node name="AlertFill" type="MeshInstance3D" parent="AlertBar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.01)
+mesh = SubResource("BoxMesh_alert_fill")
+material_override = SubResource("StandardMaterial3D_alert_fill")
+
+[node name="HpBar" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.82, 0)
+
+[node name="HpBack" type="MeshInstance3D" parent="HpBar"]
+mesh = SubResource("BoxMesh_hp_back")
+material_override = SubResource("StandardMaterial3D_hp_back")
+
+[node name="HpFill" type="MeshInstance3D" parent="HpBar"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.01)
+mesh = SubResource("BoxMesh_hp_fill")
+material_override = SubResource("StandardMaterial3D_hp_fill")

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://fogofwar000001"]
+
+[ext_resource type="Script" path="res://scripts/systems/fog_of_war.gd" id="1_fogofwar"]
+
+[node name="FogOfWar" type="Node3D"]
+script = ExtResource("1_fogofwar")

@@ -1,6 +1,8 @@
 # bullet_3d.gd
+# 3D 子弹实体：向前飞行，碰撞障碍物或敌人（触发 take_damage）。
 # 3D 子弹：Area3D 沿方向飞行，命中 enemies group 时调用 take_damage。
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写子弹
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Area3D
 
 signal deactivated(bullet: Area3D)

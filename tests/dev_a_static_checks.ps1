@@ -81,6 +81,16 @@ Assert-Contains `
 	-Message "Signal flare must emit a global noise event from the player position."
 
 Assert-Contains `
+	-Path $player `
+	-Pattern "(?m)^\s*_spawn_signal_flare_marker\(\)" `
+	-Message "Accepted signal flares must spawn a visible marker/effect from the player layer."
+
+Assert-Contains `
+	-Path $player `
+	-Pattern "(?m)^func _spawn_signal_flare_marker\(\) -> void:[\s\S]*MeshInstance3D" `
+	-Message "Signal flare marker should create a visible 3D mesh effect without relying on another module."
+
+Assert-Contains `
 	-Path $playerShooting `
 	-Pattern "func fire\(\) -> void:\s+if current_ammo <= 0:\s+return[\s\S]*current_ammo -= 1" `
 	-Message "PlayerShooting.fire() must guard and consume ammo only for successful shots."

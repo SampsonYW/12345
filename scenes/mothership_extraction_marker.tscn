@@ -1,0 +1,76 @@
+[gd_scene format=3 uid="uid://mothershipextractionmarker01"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_landing"]
+top_radius = 3.5
+bottom_radius = 3.5
+height = 0.12
+radial_segments = 48
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_landing"]
+albedo_color = Color(0.1, 0.55, 0.5, 1)
+roughness = 0.65
+emission_enabled = true
+emission = Color(0, 0.9, 0.8, 1)
+emission_energy_multiplier = 0.35
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_beam"]
+top_radius = 0.32
+bottom_radius = 0.32
+height = 4.2
+radial_segments = 48
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_beam"]
+albedo_color = Color(0.1, 0.85, 0.78, 0.45)
+roughness = 0.65
+transparency = 1
+emission_enabled = true
+emission = Color(0, 1, 0.85, 1)
+emission_energy_multiplier = 1.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_hull"]
+size = Vector3(5.8, 0.75, 2.4)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hull"]
+albedo_color = Color(0.54, 0.58, 0.62, 1)
+roughness = 0.65
+emission_enabled = true
+emission = Color(0.2, 0.9, 0.85, 1)
+emission_energy_multiplier = 0.25
+
+[sub_resource type="BoxMesh" id="BoxMesh_ramp"]
+size = Vector3(2, 0.2, 2.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ramp"]
+albedo_color = Color(0.24, 0.32, 0.34, 1)
+roughness = 0.65
+emission_enabled = true
+emission = Color(0, 0.75, 0.7, 1)
+emission_energy_multiplier = 0.2
+
+[node name="MothershipExtractionMarker" type="Node3D"]
+
+[node name="LandingPad" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.06, 0)
+mesh = SubResource("CylinderMesh_landing")
+material_override = SubResource("StandardMaterial3D_landing")
+
+[node name="SignalBeam" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
+mesh = SubResource("CylinderMesh_beam")
+material_override = SubResource("StandardMaterial3D_beam")
+
+[node name="MothershipHull" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.8, 0)
+mesh = SubResource("BoxMesh_hull")
+material_override = SubResource("StandardMaterial3D_hull")
+
+[node name="BoardingRamp" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 1.85)
+mesh = SubResource("BoxMesh_ramp")
+material_override = SubResource("StandardMaterial3D_ramp")
+
+[node name="ExtractionLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)
+light_color = Color(0, 1, 0.85, 1)
+light_energy = 4.0
+omni_range = 9.0

@@ -18,7 +18,7 @@ project/
 │   ├── player/      # 玩家相关脚本
 │   ├── enemies/     # 敌人 AI 脚本
 │   ├── items/       # 物品 & 容器脚本
-│   ├── systems/     # 独立系统（迷雾、撤离等）
+│   ├── systems/     # 独立系统（可视视野、撤离等）
 │   └── ui/          # UI 逻辑脚本
 ├── resources/       # .tres 资源文件（ItemData 等）
 │   ├── items/       # 物品数据资源

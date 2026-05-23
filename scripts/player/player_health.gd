@@ -1,10 +1,10 @@
 # player_health.gd
-# 玩家生命系统：HP 条、受伤 (含无敌帧 0.5s + 触发侵蚀跳升)、能量电池回复
-# 死亡 → GameManager.set_state(DEAD)
-# 挂在 Player 下的 PlayerHealth Node 上
+# 生命系统：管理玩家 HP、受击侵蚀增加、血量耗尽触发 DEAD 局状态。
+# Player HP, invulnerability frames, damage erosion, healing, and death state.
+# [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node
 
-signal damaged                              # 实际受伤（非 iframe 阻挡）后触发
+signal damaged
 signal died
 signal health_changed(current: float, maximum: float)
 
@@ -32,12 +32,17 @@ func take_damage(amount: float) -> void:
 		return
 	current_hp = maxf(current_hp - amount, 0.0)
 	iframe_timer = iframe_duration
-	# 受击侵蚀跳升（design.md §5.4 / §11.1）
 	GameManager.add_erosion(GameManager.HIT_EROSION_AMOUNT)
 	health_changed.emit(current_hp, max_hp)
 	damaged.emit()
 	if current_hp <= 0.0:
 		_die()
+
+
+func reset_health() -> void:
+	current_hp = max_hp
+	iframe_timer = 0.0
+	health_changed.emit(current_hp, max_hp)
 
 
 func heal(amount: float) -> void:
