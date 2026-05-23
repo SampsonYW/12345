@@ -31,6 +31,7 @@ const HP_BAR_DEPTH := 0.04
 @export var view_angle: float = 60.0
 @export var view_range: float = 8.0
 @export var vision_obstacle_mask: int = 4
+@export var movement_obstacle_mask: int = 84
 @export var attack_range: float = 1.5
 @export var attack_cooldown: float = 1.0
 
@@ -414,7 +415,7 @@ func _has_obstacle_ahead(move_dir: Vector3, look_ahead: float) -> bool:
 	var dir := move_dir.normalized()
 	var origin := global_position + Vector3.UP * 0.5
 	var end := origin + dir * look_ahead * 2.0
-	var query := PhysicsRayQueryParameters3D.create(origin, end, vision_obstacle_mask)
+	var query := PhysicsRayQueryParameters3D.create(origin, end, movement_obstacle_mask)
 	query.exclude = [get_rid()]
 	var result := space_state.intersect_ray(query)
 	return not result.is_empty()
@@ -448,7 +449,7 @@ func _get_avoidance_direction(original_dir: Vector3) -> Vector3:
 	for attempt in attempts:
 		var dir := attempt.normalized()
 		var end := origin + dir * look_dist
-		var query := PhysicsRayQueryParameters3D.create(origin, end, vision_obstacle_mask)
+		var query := PhysicsRayQueryParameters3D.create(origin, end, movement_obstacle_mask)
 		query.exclude = [get_rid()]
 		var result := space_state.intersect_ray(query)
 		if result.is_empty():

@@ -564,12 +564,30 @@ Game3D 的 `_apply_location(location)` 是地图切换核心：
 |-------|------|------|
 | 1 | Player | Player3D |
 | 2 | Enemy | Enemy3D |
-| 3 | Obstacles | POI 障碍 StaticBody3D，layer = 4（位 3 = bit 2 = value 4） |
+| 3 | Obstacles | POI 高障碍 StaticBody3D（sy>1.0），layer = 4 |
 | 4 | Projectiles | Bullet3D Area3D |
 | 5 | Containers | Container3D 的 InteractArea |
 | 6 | Boundary | 地图边界 wall |
+| 7 | LowObstacle | POI 矮障碍（RUBBLE / sy≤1.0），layer = 64 |
 
-视野系统的 obstacle 射线掩码 = `1 << 2 = 4`，刷怪点的地面检测 mask = `4`，都对齐"obstacles 在 layer 3"。
+`_make_static_body(kind, sx, sy, sz)` 在每个 POI 内根据 `sy ≤ 1.0` 自动分流到 layer 7。
+
+各物体的 collision_layer / collision_mask 配置：
+
+| 物体 | layer | mask | 说明 |
+|------|-------|------|------|
+| Player3D | 1 | 86 (= 2+4+16+64) | 被 Enemy/Obstacle/Container/LowObstacle 挡 |
+| Enemy3D | 2 | 87 (= 1+2+4+16+64) | 被 Player/Enemy/Obstacle/Container/LowObstacle 挡 |
+| Bullet3D | 8 | 6 (= 2+4) | 命中 Enemy/Obstacle；穿过 Container 和 LowObstacle |
+| Container | 16 | 0 | 只被动碰撞 |
+| 高障碍 (sy>1.0) | 4 | 0 | 挡所有 |
+| 矮障碍 (sy≤1.0) | 64 | 0 | 挡玩家/敌人，不挡子弹/视线 |
+| 地面/POI 外墙 | 4 | 0 | 同高障碍 |
+
+敌人 AI 用两套 mask 分工：
+- `vision_obstacle_mask = 4`：视线检测，只看高墙——箱子和矮障碍都不挡视线（巡逻怪能透过箱子/矮障碍发现玩家）
+- `movement_obstacle_mask = 84` (= 4+16+64)：移动/局部避障——AI 在 patrol 路径上主动绕开三类
+刷怪点地面检测 mask = `4`。
 
 ### 15.2 Groups
 

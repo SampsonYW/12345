@@ -258,10 +258,11 @@ var player := get_tree().get_first_node_in_group("player")
 |-------|------|------|
 | 1 | Player | 玩家碰撞体 |
 | 2 | Enemy | 敌人碰撞体 |
-| 3 | Obstacles | 障碍物 / 墙壁 |
+| 3 | Obstacles | 障碍物 / 墙壁（高，挡视线/子弹） |
 | 4 | Projectiles | 子弹 |
 | 5 | Containers | 容器交互 |
 | 6 | Boundary | 地图边界 |
+| 7 | LowObstacle | 矮障碍物（不挡视线/子弹，挡玩家/敌人移动） |
 
 新增碰撞层需在此表格和 `project.godot` 中同步更新。
 
