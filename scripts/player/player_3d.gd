@@ -68,6 +68,16 @@ func get_sprint_cooldown_ratio() -> float:
 	return clampf(_cooldown_timer / sprint_cooldown, 0.0, 1.0)
 
 
+func is_sprinting() -> bool:
+	return _is_sprinting
+
+
+func get_sprint_duration_ratio() -> float:
+	if sprint_duration <= 0.0:
+		return 0.0
+	return clampf(_sprint_timer / sprint_duration, 0.0, 1.0)
+
+
 func is_input_locked() -> bool:
 	return GameManager.ui_blocking_input
 

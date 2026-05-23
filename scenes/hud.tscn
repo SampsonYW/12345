@@ -1,6 +1,22 @@
-[gd_scene load_steps=2 format=3 uid="uid://bhud0000001"]
+[gd_scene load_steps=3 format=3 uid="uid://bhud0000001"]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_soft"]
+content_margin_left = 20.0
+content_margin_top = 16.0
+content_margin_right = 20.0
+content_margin_bottom = 16.0
+bg_color = Color(0.1, 0.1, 0.12, 0.6)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.4, 0.5, 0.2)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [node name="HUD" type="Control"]
 layout_mode = 3
@@ -10,20 +26,26 @@ anchor_bottom = 1.0
 mouse_filter = 2
 script = ExtResource("1_hud")
 
-[node name="TopLeft" type="VBoxContainer" parent="."]
+[node name="TopLeftPanel" type="PanelContainer" parent="."]
 layout_mode = 1
-offset_left = 20.0
-offset_top = 20.0
-offset_right = 260.0
-offset_bottom = 200.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 264.0
+offset_bottom = 204.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_soft")
+
+[node name="TopLeft" type="VBoxContainer" parent="TopLeftPanel"]
+unique_name_in_owner = true
+layout_mode = 2
 mouse_filter = 2
 
-[node name="HPLabel" type="Label" parent="TopLeft"]
+[node name="HPLabel" type="Label" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "生命  100 / 100"
 
-[node name="HPBar" type="ProgressBar" parent="TopLeft"]
+[node name="HPBar" type="ProgressBar" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 16)
 layout_mode = 2
@@ -31,17 +53,17 @@ max_value = 100.0
 value = 100.0
 show_percentage = false
 
-[node name="Spacer1" type="Control" parent="TopLeft"]
+[node name="Spacer1" type="Control" parent="TopLeftPanel/TopLeft"]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="ErosionLabel" type="Label" parent="TopLeft"]
+[node name="ErosionLabel" type="Label" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "侵蚀  0%"
 
-[node name="ErosionBar" type="ProgressBar" parent="TopLeft"]
+[node name="ErosionBar" type="ProgressBar" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 16)
 layout_mode = 2
@@ -49,39 +71,96 @@ max_value = 100.0
 value = 0.0
 show_percentage = false
 
-[node name="Spacer2" type="Control" parent="TopLeft"]
+[node name="Spacer2" type="Control" parent="TopLeftPanel/TopLeft"]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="WeightLabel" type="Label" parent="TopLeft"]
+[node name="WeightLabel" type="Label" parent="TopLeftPanel/TopLeft"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "负重  0 / 50"
 
-[node name="TopRight" type="VBoxContainer" parent="."]
-layout_mode = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -260.0
-offset_top = 20.0
-offset_right = -20.0
-offset_bottom = 160.0
+[node name="ZoneSpacer" type="Control" parent="TopLeftPanel/TopLeft"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
 mouse_filter = 2
 
-[node name="AmmoLabel" type="Label" parent="TopRight"]
+[node name="ZoneInfo" type="VBoxContainer" parent="TopLeftPanel/TopLeft"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ZoneNameLabel" type="Label" parent="TopLeftPanel/TopLeft/ZoneInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="ZoneRiskLabel" type="Label" parent="TopLeftPanel/TopLeft/ZoneInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+
+[node name="TopRightPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -216.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = 200.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_soft")
+
+[node name="TopRight" type="VBoxContainer" parent="TopRightPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="StateLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "状态  准备中"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="TimeLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "时间  00:00"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="SignalLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "信号  就绪"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="RiskLabel" type="Label" parent="TopRightPanel/TopRight"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "风险  标题"
+horizontal_alignment = 2
+theme_override_font_sizes/font_size = 24
+
+[node name="AmmoLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "弹药  60 / 60"
 horizontal_alignment = 2
 
-[node name="ScoreLabel" type="Label" parent="TopRight"]
+[node name="ScoreLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "分数  0"
 horizontal_alignment = 2
 
-[node name="CollectibleLabel" type="Label" parent="TopRight"]
+[node name="CollectibleLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "收集品  0"
