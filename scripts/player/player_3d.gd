@@ -46,10 +46,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed("sprint") and _cooldown_timer <= 0.0 and not _is_sprinting:
-		_is_sprinting = true
-		_sprint_timer = sprint_duration
-		_cooldown_timer = sprint_cooldown
-		NoiseManager.emit_noise(global_position, NoiseManager.Level.MEDIUM)
+		if GameManager.current_location != GameManager.Location.AFTERGLOW:
+			_is_sprinting = true
+			_sprint_timer = sprint_duration
+			_cooldown_timer = sprint_cooldown
+			NoiseManager.emit_noise(global_position, NoiseManager.Level.MEDIUM)
 		return
 
 	for i in 8:
