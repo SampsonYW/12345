@@ -1532,6 +1532,10 @@ func _update_end_flow(state: int) -> void:
 			_result_overlay.visible = false
 		return
 
+	# 死亡 / 撤离成功时，强制关掉背包/仓库/容器搜索弹层，否则它们会挡住结算屏。
+	if _active_blocking_overlay != null:
+		close_blocking_overlay()
+
 	var success := state == GameManager.State.SUCCESS
 	var score := _get_run_score() if success else 0
 	_result_title_label.text = "撤离成功" if success else "行动失败"

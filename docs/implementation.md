@@ -373,7 +373,8 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 8. **屏幕边缘警戒指示** — `_alert_indicators` 把 ALERT_DETECTION_RANGE 内觉醒的敌人画成屏幕边缘红点
 9. **刷怪脉冲** — 监听 `SpawnManager.spawn_occurred`，在敌人方向上画一次性脉冲
 10. **小地图** — `_minimap = Minimap.new()`，绘制由 Minimap 类自己处理
-11. **键盘输入劫持** — `_unhandled_input` 响应：B（开/关背包 overlay）、ESC（关闭任意 overlay）、Enter/Space（在主菜单/结果弹层时确认）。**注意**：`use_slot_1..8` 数字键由 Player3D 处理直接对应背包槽位，HUD 不再劫持（2026-05-23 之前曾用 `SHORTCUT_KEYS` 在 overlay 打开时把 1-8 劫持成"快速转移容器/仓库第 N 项"，已删除——参见 §19.2 语义耦合案例）。
+11. **键盘输入劫持** — `_unhandled_input` 响应：B（开/关背包 overlay）、ESC（关闭任意 overlay）、Enter/Space（在主菜单/结果弹层时确认）。**注意**：`use_slot_1..8` 数字键由 Player3D 处理直接对应背包槽位，HUD 不再劫持（2026-05-23 之前曾用 `SHORTCUT_KEYS` 在 overlay 打开时把 1-8 劫持成"快速转移容器/仓库第 N 项"，已删除——参见 §19.4 已修复案例）。
+12. **结算屏接管** — `_update_end_flow` 在 SUCCESS/DEAD 进入时**强制关闭任意激活的 blocking overlay**（背包/仓库/容器搜索）+ 隐藏 main_overlay + 隐藏运行时 HUD + 显示 result_overlay。强制关闭这一步是必须的——否则玩家在 loot 界面里被打死时 overlay 会挡住 result_overlay，UI 卡住。
 
 ### 10.2 内部状态字段（直接节点引用 + 数据缓存共 70+ 变量）
 
@@ -737,6 +738,7 @@ Minimap ─→ ExpeditionMap.get_bounds / collect_obstacle_positions
 
 - **HUD overlay 数字键劫持（SHORTCUT_KEYS）** —— 2026-05-23 删除。`hud.gd` 曾有 `SHORTCUT_KEYS = [KEY_1..KEY_8]` 常量 + `_handle_overlay_shortcut`：在 search overlay 打开时把 1-8 键映射到 `_transfer_container_entry(index)`，在 storage overlay 打开时映射到仓库列表。这个机制最初是从背包 8 槽设计的（背包就是 8 个），后来容器扩到 12 格，但常量没人改——结果**容器第 9-12 格的物品没办法用数字键快取**。这是经典语义耦合：旧场景的隐含假设（"槽数 ≤ 8"）跟着代码复用渗透到了新场景，但行为不对。修复方式不是"扩 SHORTCUT_KEYS 到 12"——那样仓库又得对齐——而是直接砍掉劫持，鼠标点击 / 拖拽 / 右键菜单已经能完成转移。
 - **容器搜索 overlay 取出后槽位仍显示"已转移"** —— 已修复。`_populate_container_list` 把 transferred 槽设成空字符串，但 `_update_container_search_labels` 每帧又把它覆盖回"已转移"。两个函数有各自的"该显示什么"判断，不一致 → 视觉残留 → 用户以为槽位不可重用。修复方式：抽 `_container_slot_text(index)` 共享 helper，单一真相源。
+- **loot/背包 overlay 打开时被怪打死卡 UI** —— 2026-05-23 修复。HUD `_update_end_flow` 进入 SUCCESS/DEAD 状态时显示 result_overlay 并把 ui_blocking 设回 true，但**忘了关已激活的 blocking overlay**。结果两层 UI 互相挡，玩家看不到结算屏。是典型的"两个独立功能（弹层管理 vs 结算流程）共享同一个 ui_blocking 开关但不互相通知"造成的状态不一致。修复方式：`_update_end_flow` 在 SUCCESS/DEAD 分支开头先 `close_blocking_overlay()` 再走结算流程。
 
 ---
 
