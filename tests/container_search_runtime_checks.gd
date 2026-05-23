@@ -94,6 +94,31 @@ func _run() -> void:
 	_expect(not container.transfer_revealed_item_to_inventory(1, inventory), "Transfer should block when inventory has no empty slots")
 	_expect(not container.is_entry_transferred(1), "Full-inventory block should leave item in the container")
 
+	# ----- 双向 round-trip: 背包→容器（add_item_to_container）-----
+	_expect(container.has_method("add_item_to_container"), "Container should expose add_item_to_container(item)")
+	_expect(not container.add_item_to_container(null), "add_item_to_container(null) should fail")
+
+	# 此时 entry 0 已 transferred、entry 1/2 占用未 transferred；新 item 应复用 entry 0
+	var entry_count_before: int = container.get_search_entry_count()
+	_expect(container.is_entry_transferred(0), "Precondition: entry 0 should be transferred")
+	var new_item := _make_item("Stowed Battery", RARITY_COMMON, 0.5, 5)
+	_expect(container.add_item_to_container(new_item), "add_item_to_container should accept valid items")
+	_expect(container.get_search_entry_count() == entry_count_before, "Stowed item should reuse the transferred slot, not append")
+	_expect(not container.is_entry_transferred(0), "Reused slot should clear transferred flag")
+	_expect(container.is_entry_revealed(0), "Reused slot should be immediately revealed")
+	_expect(container.get_revealed_item_name(0) == "Stowed Battery", "Reused slot should hold the new item")
+
+	# 没有 transferred 槽时应 append（再 transfer 一次然后看新 append 还是复用）
+	var inv2: Node = inventory_script.new()
+	root.add_child(inv2)
+	await process_frame
+	# 让所有 entries 都非 transferred，且容量未满 → append
+	var count_after_reuse: int = container.get_search_entry_count()
+	var append_item := _make_item("Appended Tag", RARITY_COMMON, 0.1, 1)
+	_expect(container.add_item_to_container(append_item), "When no transferred slot exists, add should append")
+	_expect(container.get_search_entry_count() == count_after_reuse + 1, "Append should increase entry count by 1")
+	inv2.queue_free()
+
 	await _finish(container, inventory, previous_max_weight, previous_erosion, game_manager)
 
 

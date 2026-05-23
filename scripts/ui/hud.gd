@@ -739,19 +739,24 @@ func _build_search_overlay() -> Control:
 	left.add_child(_make_backpack_grid())
 
 	var right := VBoxContainer.new()
+	right.set_script(STORAGE_DRAG_SLOT_SCRIPT)
+	right.set("owner_hud", self)
+	right.set("accept_target", "container_list")
 	right.custom_minimum_size = Vector2(430.0, 0.0)
 	right.add_theme_constant_override("separation", 10)
 	columns.add_child(right)
 	right.add_child(_make_overlay_title("容器"))
-	var list := VBoxContainer.new()
+	var list := GridContainer.new()
 	list.name = "ContainerList"
-	list.add_theme_constant_override("separation", 6)
+	list.columns = 3
+	list.add_theme_constant_override("h_separation", 8)
+	list.add_theme_constant_override("v_separation", 8)
 	right.add_child(list)
 	_search_feedback_label = _make_hint_label("")
 	_search_feedback_label.name = "SearchFeedback"
 	right.add_child(_search_feedback_label)
 	right.add_child(_make_hint_label(
-		"右键已发现物品可快速转移到背包。"
+		"右键已发现物品可快速转移到背包；右键背包格子可存入容器。"
 	))
 	return overlay
 
@@ -928,6 +933,9 @@ func _show_context_menu_at(at_position: Vector2, item: ItemDataResource, loc: in
 			menu.set_item_tooltip(use_idx, "残响碎片仅在撤离后结算分数")
 		# Discard action
 		menu.add_item("丢弃", 2)
+		# Store to open container (only if container search overlay is currently open)
+		if _search_overlay != null and _search_overlay.visible and _search_container != null:
+			menu.add_item("存入容器", 6)
 	elif loc == GameManager.Location.AFTERGLOW:
 		# Transfer to warehouse
 		menu.add_item("转移到仓库", 3)
@@ -969,6 +977,9 @@ func _on_context_menu_id_pressed(id: int) -> void:
 		5:  # 转移到背包 (expedition container → backpack)
 			if _context_container_index >= 0:
 				_transfer_container_entry(_context_container_index)
+		6:  # 存入容器 (expedition backpack → container)
+			if _context_slot_index >= 0:
+				transfer_backpack_slot_to_container(_context_slot_index)
 	_context_slot_index = -1
 	_context_warehouse_name = ""
 	_context_container_index = -1
@@ -1037,58 +1048,66 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 func _populate_container_list() -> void:
 	if _search_overlay == null:
 		return
-	var list := _search_overlay.find_child("ContainerList", true, false) as VBoxContainer
-	if list == null:
+	var grid := _search_overlay.find_child("ContainerList", true, false) as GridContainer
+	if grid == null:
 		return
-	_clear_ui_children(list)
+	_clear_ui_children(grid)
 	if _search_container == null or not is_instance_valid(_search_container):
 		return
-	var count := 0
-	if _search_container.has_method("get_search_entry_count"):
-		count = _search_container.get_search_entry_count()
-	for i in count:
-		var row_panel := PanelContainer.new()
-		row_panel.set_script(STORAGE_DRAG_SLOT_SCRIPT)
-		row_panel.set("owner_hud", self)
-		row_panel.set("accept_target", "container_list")
-		row_panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.07, 0.08, 0.075, 0.72)))
-		if _can_transfer_container_entry(i):
-			row_panel.set("drag_payload", {
+	var capacity: int = 12
+	if _search_container.has_method("get_capacity"):
+		capacity = int(_search_container.get_capacity())
+	for i in capacity:
+		var text := _container_slot_text(i)
+		var is_empty := text == ""
+		var slot := PanelContainer.new()
+		slot.name = "ContainerSlot%d" % i
+		slot.custom_minimum_size = Vector2(120.0, 106.0)
+		var bg: Color = Color(0.05, 0.055, 0.05, 0.55) if is_empty else Color(0.08, 0.09, 0.085, 0.82)
+		slot.add_theme_stylebox_override("panel", _make_panel_style(bg))
+		# 所有槽都接受 backpack drop；add_item_to_container 会优先复用 transferred 槽位
+		slot.set_script(STORAGE_DRAG_SLOT_SCRIPT)
+		slot.set("owner_hud", self)
+		slot.set("accept_target", "container_list")
+		# 仅可转移条目能被拖出 + 右键
+		if not is_empty and _can_transfer_container_entry(i):
+			slot.set("drag_payload", {
 				"source": "container",
 				"entry_index": i,
-				"label": _get_container_entry_label(i),
+				"label": text,
 			})
-		var row := HBoxContainer.new()
-		row.custom_minimum_size = Vector2(0.0, 38.0)
-		row.add_theme_constant_override("separation", 8)
-		row.mouse_filter = Control.MOUSE_FILTER_PASS
-		row_panel.add_child(row)
-		var label := Label.new()
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		label.add_theme_font_size_override("font_size", 18)
-		label.add_theme_color_override("font_color", Color(0.90, 0.94, 0.88, 1.0))
-		label.mouse_filter = Control.MOUSE_FILTER_PASS
-		label.text = "%d  %s" % [i + 1, _get_container_entry_label(i)]
-		row.add_child(label)
-		var button := Button.new()
-		button.text = "转移"
-		button.disabled = not _can_transfer_container_entry(i)
-		button.custom_minimum_size = Vector2(78.0, 30.0)
-		button.pressed.connect(Callable(self, "_transfer_container_entry").bind(i))
-		row.add_child(button)
-		# Right-click context menu support
-		if _can_transfer_container_entry(i):
-			row_panel.gui_input.connect(_on_container_row_gui_input.bind(i))
-		list.add_child(row_panel)
+			slot.gui_input.connect(_on_container_row_gui_input.bind(i))
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 4)
+		slot.add_child(box)
+		var title := Label.new()
+		title.name = "ItemName"
+		title.clip_text = true
+		title.add_theme_font_size_override("font_size", 18)
+		var color: Color = Color(0.45, 0.48, 0.45, 0.7) if is_empty else Color(0.92, 0.96, 0.90, 1.0)
+		title.add_theme_color_override("font_color", color)
+		title.text = text
+		box.add_child(title)
+		grid.add_child(slot)
 	_save_search_snapshot()
+
+
+## 容器槽位显示文本（统一在 _populate_container_list 和 _update_container_search_labels 用）
+## 空槽位和已转移槽位都返回 ""（视觉上一致，可被复用接收新物品）
+func _container_slot_text(index: int) -> String:
+	if _search_container == null or not _search_container.has_method("get_search_entry_count"):
+		return ""
+	if index >= _search_container.get_search_entry_count():
+		return ""
+	if _search_container.has_method("is_entry_transferred") and _search_container.is_entry_transferred(index):
+		return ""
+	return _get_container_entry_label(index)
 
 
 func _get_container_entry_label(index: int) -> String:
 	if _search_container == null:
 		return "未知"
 	var container := _search_container
-	if container.has_method("is_entry_transferred") and container.is_entry_transferred(index):
-		return "已转移"
 	if container.has_method("is_entry_revealed") and container.is_entry_revealed(index):
 		if container.has_method("get_revealed_item_name"):
 			return container.get_revealed_item_name(index)
@@ -1145,6 +1164,33 @@ func transfer_backpack_slot_to_storage(slot_index: int) -> bool:
 	return true
 
 
+## 把背包某槽位的物品存入当前打开的容器（双向 loot 转移的反向）。
+## 返回 true 表示成功。
+func transfer_backpack_slot_to_container(slot_index: int) -> bool:
+	if _search_container == null or not is_instance_valid(_search_container):
+		return false
+	if _inventory == null or not _inventory.has_method("get_slot_item"):
+		return false
+	var item: ItemDataResource = _inventory.get_slot_item(slot_index)
+	if item == null:
+		return false
+	if not _search_container.has_method("add_item_to_container"):
+		return false
+	var removed: ItemDataResource = _inventory.remove_slot_item(slot_index)
+	if removed == null:
+		return false
+	if not _search_container.add_item_to_container(removed):
+		# 回滚到背包
+		_inventory.add_item(removed)
+		_set_search_feedback("无法存入容器。")
+		return false
+	_set_search_feedback("已存入容器。")
+	if _search_overlay != null and _search_overlay.visible:
+		_populate_backpack_grid(_search_overlay.find_child("BackpackGrid", true, false) as GridContainer)
+		_populate_container_list()
+	return true
+
+
 func can_accept_storage_drop(data: Variant, target: String) -> bool:
 	if not (data is Dictionary):
 		return false
@@ -1153,6 +1199,8 @@ func can_accept_storage_drop(data: Variant, target: String) -> bool:
 	if target == "backpack_slot":
 		return source == "warehouse" or source == "container"
 	if target == "warehouse_list":
+		return source == "backpack"
+	if target == "container_list":
 		return source == "backpack"
 	return false
 
@@ -1168,6 +1216,8 @@ func accept_storage_drop(data: Variant, target: String) -> bool:
 		return _transfer_container_entry(int(payload.get("entry_index", -1)))
 	if target == "warehouse_list" and source == "backpack":
 		return transfer_backpack_slot_to_storage(int(payload.get("slot_index", -1)))
+	if target == "container_list" and source == "backpack":
+		return transfer_backpack_slot_to_container(int(payload.get("slot_index", -1)))
 	return false
 
 
@@ -1323,18 +1373,17 @@ func _save_search_snapshot() -> void:
 func _update_container_search_labels() -> void:
 	if _search_overlay == null:
 		return
-	var list := _search_overlay.find_child("ContainerList", true, false) as VBoxContainer
-	if list == null:
+	var grid := _search_overlay.find_child("ContainerList", true, false) as GridContainer
+	if grid == null:
 		return
-	var children := list.get_children()
+	var children := grid.get_children()
 	for i in children.size():
-		var row_panel: Control = children[i]
-		var row := row_panel.get_child(0) if row_panel.get_child_count() > 0 else null
-		if row == null:
+		var slot := children[i] as PanelContainer
+		if slot == null:
 			continue
-		var label := row.get_child(0) if row.get_child_count() > 0 else null
-		if label is Label:
-			label.text = "%d  %s" % [i + 1, _get_container_entry_label(i)]
+		var label := slot.find_child("ItemName", true, false) as Label
+		if label != null:
+			label.text = _container_slot_text(i)
 
 
 func _show_main_overlay(is_show: bool) -> void:

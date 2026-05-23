@@ -10,6 +10,9 @@ signal cracked(container: StaticBody3D)
 const ITEM_PICKUP_SCENE := preload("res://scenes/item_pickup_3d.tscn")
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
 
+## 容器的最大条目数（loot + 玩家放回的物品之和），跟 HUD 里 ContainerGrid 的格子数一致
+const MAX_ENTRIES: int = 12
+
 @export var loot_table: Array[ItemDataResource] = []
 @export var risk: String = "low"
 @export var base_crack_time: float = 2.0
@@ -181,6 +184,40 @@ func transfer_revealed_item_to_inventory(index: int, inventory: Node) -> bool:
 	entry.transferred = true
 	_search_entries[index] = entry
 	return true
+
+
+## 把玩家背包里的物品放回容器。
+## 优先复用之前被"转移走"的槽位（让 UI 中的空格能继续接收物品）；
+## 没有可复用槽位时 append 到末尾，受 MAX_ENTRIES 上限约束。
+## 返回 true 表示放入成功。
+func add_item_to_container(item: ItemDataResource) -> bool:
+	if item == null:
+		return false
+	# 先扫描已转移槽位复用（保留索引，让 UI"空格"复活成放回的物品）
+	for i in _search_entries.size():
+		if bool(_search_entries[i].transferred):
+			_search_entries[i] = {
+				"item": item,
+				"revealed": true,
+				"transferred": false,
+				"search_progress": 0.0,
+			}
+			return true
+	# 全部槽位都还在用 → 尝试 append
+	if _search_entries.size() >= MAX_ENTRIES:
+		return false
+	_search_entries.append({
+		"item": item,
+		"revealed": true,
+		"transferred": false,
+		"search_progress": 0.0,
+	})
+	return true
+
+
+## 容器槽位上限（HUD ContainerGrid 用来摆出固定数量的格子）
+func get_capacity() -> int:
+	return MAX_ENTRIES
 
 
 func _interrupt() -> void:
