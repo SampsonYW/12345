@@ -7,7 +7,6 @@ const EMPTY_SLOT_COLOR := Color(0.04, 0.05, 0.06, 0.72)
 const SLOT_BORDER_COLOR := Color(0.1, 0.3, 0.4, 0.5)
 const ACCENT_COLOR := Color(0.1, 0.85, 0.9, 1.0)
 const START_KEYS := [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]
-const SHORTCUT_KEYS := [KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8]
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
 const ITEM_RELIC := preload("res://resources/items/relic_small.tres")
 const ITEM_AMMO := preload("res://resources/items/standard_ammo.tres")
@@ -176,9 +175,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.keycode == KEY_ESCAPE and _active_blocking_overlay != null:
 		_mark_input_as_handled()
 		close_blocking_overlay()
-		return
-	if _active_blocking_overlay != null and _handle_overlay_shortcut(event):
-		_mark_input_as_handled()
 		return
 
 
@@ -1294,23 +1290,6 @@ func _process_container_search(delta: float) -> void:
 		_populate_container_list()
 	else:
 		_update_container_search_labels()
-
-
-func _handle_overlay_shortcut(event: InputEventKey) -> bool:
-	var shortcut_index := SHORTCUT_KEYS.find(event.physical_keycode)
-	if shortcut_index < 0:
-		shortcut_index = SHORTCUT_KEYS.find(event.keycode)
-	if shortcut_index < 0:
-		return false
-	if _search_overlay != null and _search_overlay.visible:
-		_transfer_container_entry(shortcut_index)
-		return true
-	if (_storage_overlay != null
-			and _storage_overlay.visible
-			and shortcut_index < _warehouse_order.size()):
-		_transfer_warehouse_item(_warehouse_order[shortcut_index])
-		return true
-	return false
 
 
 func _entry_search_complete(index: int) -> bool:
