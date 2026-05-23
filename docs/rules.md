@@ -426,6 +426,37 @@ extends Node2D
 
 这不是为了追责，而是帮助团队快速识别哪些代码需要额外 review。
 
+### 6.5 AI 必须随代码同步更新 implementation.md（强制）
+
+`docs/implementation.md` 是项目结构 + 每个模块的实现思路 + **模块间耦合关系**的权威清单。它会很快过时，**AI 是最容易"改完代码就提交，忘了同步文档"的角色**，所以这条单独列为 AI 规范的一部分。任何 AI 进行的代码变更必须**同步更新 implementation.md 对应章节**，否则视为变更未完成。
+
+具体触发条件：
+
+| 代码变更类型 | 必须同步的 implementation.md 章节 |
+|------------|-------------------------------|
+| 新增 / 删除 / 重命名 `.gd` 文件 | §1.1 目录结构 |
+| 修改 Autoload 列表 | §1.2 Autoload + 本文件 §1.3 |
+| 修改 `game_3d.tscn` 节点树 | §1.3 Game3D 节点树 |
+| 修改 GameManager / NoiseManager 公有 API 或信号 | §2 / §3 |
+| 修改 Player / Inventory / Container / Enemy 等模块的实现思路或耦合 | §4–§9 |
+| 新增 / 删除 HUD 弹层、拖拽路由、上下文菜单 ID、overlay 快捷键 | §10 |
+| 新增 POI 模块 / 修改 expedition_map 的 POI_REGISTRY | §11.3 / §11.4 |
+| 修改撤离流程 | §12 |
+| 修改可视视野系统 | §13 |
+| 修改输入映射 / 碰撞层 / Group | §14 / §15 |
+| 调整任意 §16 表格里列出的数值 | §16 关键数值表 |
+| 引入新的反向耦合 / 修复已知耦合 / 发现新的语义耦合 | §17 总览图 + §19 技术债 |
+| 新增 / 删除 headless test 套件 | §18 测试入口 |
+
+**AI 同步流程**（强制）：
+
+1. 完成代码改动后，**在同一回合内**立即更新 implementation.md 对应章节
+2. 即使改动不影响耦合关系，**至少**更新顶部的"最后更新"日期
+3. 在回复中显式列出"已同步 implementation.md 第 X 节"，没同步的章节也要说明（如"§17 总览图无变化"）
+4. commit message 用 `docs(impl): ...` 标注文档同步
+
+AI 不允许"先 commit 代码、回头再补文档"——这种延迟同步等同于不同步。
+
 ---
 
 ## 7. 人类开发者规范
@@ -483,7 +514,7 @@ extends Node2D
 
 - **代码与文档同步**: 修改了游戏机制 → 同步更新 `design.md`
 - **实现偏离设计时**: 先讨论，再改文档，最后改代码（文档是设计权威）
-- **新增系统时**: 在 `implementation.md` 中添加对应章节
+- **新增系统时**: 在 `implementation.md` 中添加对应章节（AI 触发规则见 §6.5）
 - **数值调整时**: 在 commit message 中记录旧值→新值
 - **模块边界变化时**: 同步更新 `docs/sprint.md` 的分工表和本文件 §1.4
 - **美术/音频需求变化时**: 同步更新 `docs/art_audio_resource_checklist.md`
@@ -563,6 +594,7 @@ GameManager.register_kill()
 - [ ] 新增 Group / 碰撞层已在 §3 登记
 - [ ] 新增/修改公有接口已检查所有调用点
 - [ ] 涉及设计变更已同步 `docs/design.md`
+- [ ] **已按 §6.5 同步 `docs/implementation.md` 对应章节**
 - [ ] 涉及任务分工或 owner 变化已同步 `docs/sprint.md`
 - [ ] Commit message 遵循 §5.2 格式
 - [ ] 编辑器运行无报错
