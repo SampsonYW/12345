@@ -2,7 +2,7 @@
 
 > 本文档为 `design.md` 的技术实现补充。**完全脱离代码会很快过时，所以每次代码变更后必须按 `docs/rules.md §6.5` 同步更新本文档。**
 >
-> **最后更新**: 2026-05-23
+> **最后更新**: 2026-05-24
 >
 > **当前口径**: 主玩法已完全切换到 3D 正交斜俯视。已落地：3D 玩家 / 射击 / HP / 背包 / 容器搜索（带条目模型 + 双向转移）/ 敌人 AI（巡逻 + 休眠合并一个脚本）/ 噪音 / 信号弹与撤离 / 时间-侵蚀刷怪 / 可视视野（视野锥 + 近距圆）/ 母车甲板与探索场景双地图切换 / POI 驱动的远征地图（8 个 POI 模块自包含构建）/ HUD 三态弹层（背包 / 仓库 / 容器搜索）+ 拖拽与右键菜单。本文档按模块自顶向下描述实现思路与**模块间耦合关系**。
 
@@ -245,7 +245,9 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 
 - 持子弹池（默认 18 颗，按需扩容），从 `Entities/Projectiles` 里捞实例。开火扣弹药、调 `bullet.activate(origin, dir, speed)`、调 `NoiseManager.emit_noise(HIGH)`。
 - 信号：`ammo_changed(current, max)`。
+- 公有 API：`add_ammo(amount)` 增量补充弹药；`refill_ammo()` 满弹（切换 location 时由 Game3D 调用，确保回到母车后弹药满）。
 - 依赖 Player3D 的 `get_aim_direction()`；间接依赖 Bullet 实例的 `activate / deactivate` 公有 API。
+- **特殊**：Game3D 在切换 location 时主动调 `refill_ammo()`（与 `reset_health` 对称，修复弹药跨 Run 残留 bug）。
 
 ### 5.3 Inventory
 
@@ -511,6 +513,20 @@ Game3D 的 `_apply_location(location)` 是地图切换核心：
 - 调 SpawnManager.on_signal_flare（通过 `get_parent().get_node_or_null("SpawnManager")` —— 又一处节点路径耦合）。
 - 调所有 group "enemies" 的 `react_to_signal_flare`。
 - 被 HUD 通过 `_extraction = scene.get_node_or_null("Extraction")` 反查 + 调 `get_status_text / get_pressure_status / get_remaining_time / has_arrived`。
+
+### 12.3 Run 结束后的状态处理
+
+Run 结束（SUCCESS 或 DEAD）后，通过 HUD 结算屏 → `GameManager.return_to_afterglow()` → `Game3D._apply_location(AFTERGLOW)` 完成重置：
+
+| 场景 | 背包 | 血量 | 弹药 | 侵蚀 |
+|------|------|------|------|------|
+| 撤离成功 (SUCCESS) | **保留** | 补满 | 补满 | 清零 |
+| 撤离失败 (DEAD) | **清空** | 补满 | 补满 | 清零 |
+
+- **背包清空**：`Game3D._on_run_finished(DEAD)` 监听 `GameManager.run_finished` 信号，死亡时立即调 `Inventory.clear_on_death()`。
+- **血量补满**：`Game3D._apply_location` → `_reset_player_health()` → `PlayerHealth.reset_health()`。
+- **弹药补满**：`Game3D._apply_location` → `_refill_player_ammo()` → `PlayerShooting.refill_ammo()`。
+- **侵蚀清零**：`GameManager.return_to_afterglow()` → `reset_run()` → `player_erosion = 0.0`。
 
 ---
 

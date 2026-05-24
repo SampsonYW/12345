@@ -39,6 +39,8 @@ func _ready() -> void:
 		GameManager.state_changed.connect(_on_game_state_changed)
 	if not GameManager.location_changed.is_connected(_on_location_changed):
 		GameManager.location_changed.connect(_on_location_changed)
+	if not GameManager.run_finished.is_connected(_on_run_finished):
+		GameManager.run_finished.connect(_on_run_finished)
 	_apply_location(GameManager.current_location)
 	if GameManager.current_state == GameManager.State.RUNNING:
 		_spawn_enemies()
@@ -196,8 +198,9 @@ func _apply_location(location: int) -> void:
 	if _expedition_map != null and _expedition_map.has_method("deactivate"):
 		_expedition_map.deactivate()
 
-	# Reset player health when switching locations (fixes HP persisting across runs)
+	# Reset player stats when switching locations (fixes HP/ammo persisting across runs)
 	_reset_player_health()
+	_refill_player_ammo()
 
 	# Activate target map
 	if afterglow_active and _afterglow_map != null and _afterglow_map.has_method("activate"):
@@ -298,6 +301,27 @@ func _reset_player_health() -> void:
 	var ph: Node = _player.get_node_or_null("PlayerHealth")
 	if ph != null and ph.has_method("reset_health"):
 		ph.reset_health()
+
+
+func _refill_player_ammo() -> void:
+	if _player == null:
+		return
+	var ps: Node = _player.get_node_or_null("PlayerShooting")
+	if ps != null and ps.has_method("refill_ammo"):
+		ps.refill_ammo()
+
+
+func _clear_player_inventory() -> void:
+	if _player == null:
+		return
+	var inv: Node = _player.get_node_or_null("Inventory")
+	if inv != null and inv.has_method("clear_on_death"):
+		inv.clear_on_death()
+
+
+func _on_run_finished(final_state: int) -> void:
+	if final_state == GameManager.State.DEAD:
+		_clear_player_inventory()
 
 
 func _reset_expedition_map() -> void:

@@ -67,6 +67,11 @@ func add_ammo(amount: int) -> void:
 	ammo_changed.emit(current_ammo, max_ammo)
 
 
+func refill_ammo() -> void:
+	current_ammo = max_ammo
+	ammo_changed.emit(current_ammo, max_ammo)
+
+
 func _get_fire_direction() -> Vector3:
 	if _player.has_method("get_aim_direction"):
 		return _player.get_aim_direction()
