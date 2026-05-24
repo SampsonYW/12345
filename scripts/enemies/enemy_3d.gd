@@ -24,7 +24,6 @@ const HP_BAR_HEIGHT := 0.08
 const HP_BAR_DEPTH := 0.04
 const NAV_UPDATE_INTERVAL := 0.2
 const VISION_CHECK_INTERVAL := 0.15
-const BILLBOARD_INTERVAL := 0.1
 
 @export var alert_threshold: float = 100.0
 @export var decay_rate: float = 5.0
@@ -63,7 +62,6 @@ var _nav_update_timer: float = 0.0
 var _cached_nav_direction: Vector3 = Vector3.ZERO
 var _vision_check_timer: float = 0.0
 var _cached_can_see_player: bool = false
-var _billboard_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -82,17 +80,13 @@ func _ready() -> void:
 	# 错开各敌人的定时器，分散同帧计算压力
 	_nav_update_timer = randf() * NAV_UPDATE_INTERVAL
 	_vision_check_timer = randf() * VISION_CHECK_INTERVAL
-	_billboard_timer = randf() * BILLBOARD_INTERVAL
 
 
 func _process(delta: float) -> void:
 	if not _is_awake and _current_alert > 0.0:
 		_current_alert = maxf(0.0, _current_alert - decay_rate * delta)
 		_update_alert_bar()
-	_billboard_timer -= delta
-	if _billboard_timer <= 0.0:
-		_billboard_timer = BILLBOARD_INTERVAL
-		_billboard_bars()
+	_billboard_bars()
 
 
 func _physics_process(delta: float) -> void:

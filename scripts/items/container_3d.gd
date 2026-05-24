@@ -23,6 +23,10 @@ var _is_cracking: bool = false
 var _player_in_range: bool = false
 var _search_entries: Array[Dictionary] = []
 
+var _progress_viewport: SubViewport
+var _progress_bar: ProgressBar
+var _progress_sprite: Sprite3D
+
 @onready var _visual: MeshInstance3D = $Visual
 @onready var _interact_area: Area3D = $InteractArea
 
@@ -33,6 +37,7 @@ func _ready() -> void:
 	if _visual.material_override != null:
 		_visual.material_override = _visual.material_override.duplicate()
 	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
+	_setup_progress_ui()
 
 
 ## Restore this container to its initial (unopened) state.
@@ -43,6 +48,8 @@ func reset() -> void:
 	_player_in_range = false
 	_search_entries.clear()
 	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
+	if _progress_sprite:
+		_progress_sprite.visible = false
 
 
 
@@ -62,6 +69,7 @@ func _process(delta: float) -> void:
 			_start_crack()
 		_crack_progress += delta / get_crack_duration()
 		_set_visual_color(Color(0.75, 0.62, 0.32, 1.0).lerp(Color(1.0, 0.9, 0.45, 1.0), _crack_progress))
+		_update_progress_ui()
 		if _crack_progress >= 1.0:
 			_complete_crack()
 	else:
@@ -78,6 +86,11 @@ func _start_crack() -> void:
 	_is_cracking = true
 	_crack_progress = 0.0
 
+func _update_progress_ui() -> void:
+	if _progress_sprite and _progress_bar:
+		_progress_bar.value = _crack_progress
+		_progress_sprite.visible = _crack_progress > 0.0
+
 
 func _complete_crack() -> void:
 	if GameManager.ui_blocking_input:
@@ -87,6 +100,8 @@ func _complete_crack() -> void:
 	_is_cracking = false
 	_is_cracked = true
 	_set_visual_color(Color(0.34, 0.3, 0.2, 1.0))
+	if _progress_sprite:
+		_progress_sprite.visible = false
 	NoiseManager.emit_noise(global_position, NoiseManager.Level.LOW)
 	open_container()
 	cracked.emit(self)
@@ -222,6 +237,8 @@ func _interrupt() -> void:
 	_is_cracking = false
 	_crack_progress = 0.0
 	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
+	if _progress_sprite:
+		_progress_sprite.visible = false
 
 
 func _is_valid_entry_index(index: int) -> bool:
@@ -256,6 +273,37 @@ func _on_body_entered(body: Node) -> void:
 		var ph: Node = body.get_node_or_null("PlayerHealth")
 		if ph and ph.has_signal("damaged") and not ph.damaged.is_connected(_on_player_damaged):
 			ph.damaged.connect(_on_player_damaged)
+
+
+func _setup_progress_ui() -> void:
+	_progress_viewport = SubViewport.new()
+	_progress_viewport.disable_3d = true
+	_progress_viewport.transparent_bg = true
+	_progress_viewport.size = Vector2i(120, 20)
+	add_child(_progress_viewport)
+	
+	_progress_bar = ProgressBar.new()
+	_progress_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_progress_bar.max_value = 1.0
+	_progress_bar.value = 0.0
+	_progress_bar.show_percentage = false
+	
+	var bg_style := StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.1, 0.1, 0.1, 0.8)
+	_progress_bar.add_theme_stylebox_override("background", bg_style)
+	
+	var fill_style := StyleBoxFlat.new()
+	fill_style.bg_color = Color(1.0, 0.9, 0.45, 1.0)
+	_progress_bar.add_theme_stylebox_override("fill", fill_style)
+	
+	_progress_viewport.add_child(_progress_bar)
+	
+	_progress_sprite = Sprite3D.new()
+	_progress_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_progress_sprite.position = Vector3(0, 1.3, 0)
+	_progress_sprite.visible = false
+	_progress_sprite.texture = _progress_viewport.get_texture()
+	add_child(_progress_sprite)
 
 
 func _on_body_exited(body: Node) -> void:
