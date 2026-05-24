@@ -147,16 +147,8 @@ mesh = SubResource("Box_door")
 [node name="WarehousePoint" type="Node3D" parent="." unique_id=1590777244]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0.18, 7)
 
-[node name="Marker" type="MeshInstance3D" parent="WarehousePoint" unique_id=2037804408]
-material_override = SubResource("Mat_warehouse_marker")
-mesh = SubResource("Marker_disc")
-
 [node name="DeparturePoint" type="Node3D" parent="." unique_id=1891145756]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32, 0.18, 13)
-
-[node name="Marker" type="MeshInstance3D" parent="DeparturePoint" unique_id=652499939]
-material_override = SubResource("Mat_departure_marker")
-mesh = SubResource("Marker_disc")
 
 [node name="ControlsHint" type="Label3D" parent="." unique_id=1146755765]
 transform = Transform3D(1, 0, 0, 0, 0.65090686, 0.7591574, 0, -0.7591574, 0.65090686, 0, 0.5, -1.5)

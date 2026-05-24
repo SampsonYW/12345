@@ -5,7 +5,7 @@
 # [AI-ASSISTED] 2026-05-23 — 添加甲板边界墙壁和出发门碰撞体
 extends Node3D
 
-const INTERACTION_RANGE := 3.25
+const INTERACTION_RANGE := 1.5
 const DEPARTURE_HOLD_TIME := 1.4
 
 # 甲板尺寸（与 .tscn 中 Box_deck size 一致）
@@ -121,12 +121,17 @@ func _find_nearby_point() -> String:
 	if _player == null:
 		return ""
 	var p_pos := _player.global_position
-	var warehouse := _get_point("warehouse")
-	var departure := _get_point("departure")
-	if warehouse != null and p_pos.distance_to(warehouse.global_position) <= INTERACTION_RANGE:
+	
+	# WarehouseArea 所在的透明地块 (中心 x=-31, z=13, 尺寸 20x20)
+	var w_rect := Rect2(-31.0 - 10.0, 13.0 - 10.0, 20.0, 20.0)
+	if w_rect.has_point(Vector2(p_pos.x, p_pos.z)):
 		return "warehouse"
-	if departure != null and p_pos.distance_to(departure.global_position) <= INTERACTION_RANGE:
+		
+	# DepartureHatchArea 所在的深色地块 (中心 x=32, z=13, 尺寸 19x18)
+	var d_rect := Rect2(32.0 - 9.5, 13.0 - 9.0, 19.0, 18.0)
+	if d_rect.has_point(Vector2(p_pos.x, p_pos.z)):
 		return "departure"
+		
 	return ""
 
 

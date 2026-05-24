@@ -449,10 +449,10 @@ Game3D 的 `_apply_location(location)` 是地图切换核心：
 
 `scripts/maps/afterglow_map.gd`，约 180 行。
 
-- **节点结构**：`afterglow_map.tscn` 里手摆地板、墙、家具 + 两个 `Marker3D`：`WarehousePoint` 和 `DeparturePoint`。
-- **交互**：每帧 `_update_interactions` 查玩家离哪个 marker ≤ 3.25m 算"靠近"：
-  - WarehousePoint：显示"E 打开仓库"，按 E 调 `_hud.open_storage()`。
-  - DeparturePoint：显示"长按 E 出发"，按住 1.4 秒后调 `GameManager.begin_expedition()` 进远征。
+- **节点结构**：`afterglow_map.tscn` 里手摆地板、墙、家具 + 两个 `Node3D` 作为位置参考点：`WarehousePoint` 和 `DeparturePoint`（原视觉 Marker 已移除）。
+- **交互**：每帧 `_update_interactions` 查玩家是否站在对应的地块范围内（提取 `WarehouseArea` 20x20 和 `DepartureHatchArea` 19x18 的 `Rect2` 边界作为判定区）：
+  - Warehouse 区域：显示"E 打开仓库"，按 E 调 `_hud.open_storage()`。
+  - Departure 区域：显示"长按 E 出发"，按住 1.4 秒后调 `GameManager.begin_expedition()` 进远征。
 - **耦合**：依赖 HUD 的 `open_storage / set_prompt_text / show_hold_progress / hide_hold_progress` 公有 API；依赖 GameManager 状态。
 - **测试 hook**：`set_player_near_point(name)` 和 `complete_departure_for_test()` 给 headless 测试用。
 
