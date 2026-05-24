@@ -36,13 +36,15 @@ var start_after_reload: bool = false
 var current_location: Location = Location.TITLE
 var ui_blocking_input: bool = false
 
+var zone_erosion_multiplier: float = 1.0
+
 var _last_tier: int = 0
 
 
 func _process(delta: float) -> void:
 	if current_state == State.RUNNING or current_state == State.EXTRACTING:
 		elapsed_time += delta
-		add_erosion(EROSION_RATE * delta)
+		add_erosion(EROSION_RATE * delta * zone_erosion_multiplier)
 
 
 func start_run() -> void:
