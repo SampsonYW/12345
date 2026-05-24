@@ -4,6 +4,7 @@
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 # [AI-ASSISTED] 2026-05-23 — 追击/信号弹寻路升级为 A* 网格寻路（绕墙/拐角）
 # [AI-ASSISTED] 2026-05-24 — 寻路迁移到 Godot NavigationServer3D + NavigationAgent3D，删除自建 A*
+# [AI-ASSISTED] 2026-05-24 — 敌人AI性能优化：寻路/视线/避障/billboard 节流
 extends CharacterBody3D
 
 signal died(enemy: CharacterBody3D)
@@ -20,6 +21,10 @@ const ALERT_BAR_DEPTH := 0.04
 const HP_BAR_WIDTH := 1.0
 const HP_BAR_HEIGHT := 0.08
 const HP_BAR_DEPTH := 0.04
+const NAV_UPDATE_INTERVAL := 0.2
+const VISION_CHECK_INTERVAL := 0.15
+const OBSTACLE_CHECK_INTERVAL := 0.1
+const BILLBOARD_INTERVAL := 0.1
 
 @export var alert_threshold: float = 100.0
 @export var decay_rate: float = 5.0
@@ -58,6 +63,13 @@ var _obstacle_avoidance_cooldown: float = 0.0
 var _current_avoidance_dir: Vector3 = Vector3.ZERO
 var _patrol_retry_count: int = 0
 var _nav_agent: NavigationAgent3D = null
+var _nav_update_timer: float = 0.0
+var _cached_nav_direction: Vector3 = Vector3.ZERO
+var _vision_check_timer: float = 0.0
+var _cached_can_see_player: bool = false
+var _obstacle_check_timer: float = 0.0
+var _cached_obstacle_ahead: bool = false
+var _billboard_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -73,13 +85,21 @@ func _ready() -> void:
 	_pick_patrol_target()
 	_update_alert_bar()
 	_update_hp_bar()
+	# 错开各敌人的定时器，分散同帧计算压力
+	_nav_update_timer = randf() * NAV_UPDATE_INTERVAL
+	_vision_check_timer = randf() * VISION_CHECK_INTERVAL
+	_obstacle_check_timer = randf() * OBSTACLE_CHECK_INTERVAL
+	_billboard_timer = randf() * BILLBOARD_INTERVAL
 
 
 func _process(delta: float) -> void:
 	if not _is_awake and _current_alert > 0.0:
 		_current_alert = maxf(0.0, _current_alert - decay_rate * delta)
 		_update_alert_bar()
-	_billboard_bars()
+	_billboard_timer -= delta
+	if _billboard_timer <= 0.0:
+		_billboard_timer = BILLBOARD_INTERVAL
+		_billboard_bars()
 
 
 func _physics_process(delta: float) -> void:
@@ -221,7 +241,13 @@ func _update_patrol(player: Node3D, delta: float) -> void:
 		to_target = _patrol_target - global_position
 		to_target.y = 0.0
 
-	if _has_obstacle_ahead(to_target, patrol_speed * delta):
+	# 节流障碍物检测
+	_obstacle_check_timer -= delta
+	if _obstacle_check_timer <= 0.0:
+		_obstacle_check_timer = OBSTACLE_CHECK_INTERVAL
+		_cached_obstacle_ahead = _has_obstacle_ahead(to_target, patrol_speed * delta)
+
+	if _cached_obstacle_ahead:
 		# 前方有障碍物，选择侧向偏移方向
 		var avoid_dir := _get_avoidance_direction(to_target)
 		_move_flat(avoid_dir, patrol_speed * 0.7)
@@ -275,23 +301,30 @@ func _update_signal_focus(delta: float) -> void:
 ## 用 NavigationAgent3D 向目标移动。设置 target_position 让 nav server 算路径，
 ## 沿 get_next_path_position() 走 waypoint。NavMesh 几何精确，
 ## 不需要手写避障——障碍物（高/矮/箱子）在 navmesh bake 时已被排除。
+## 节流：每 NAV_UPDATE_INTERVAL 秒更新一次路径查询，中间帧沿缓存方向移动。
 func _nav_move_toward(target_pos: Vector3, speed: float) -> void:
 	if _nav_agent == null:
 		velocity = Vector3.ZERO
 		return
-	_nav_agent.target_position = target_pos
-	if _nav_agent.is_navigation_finished():
+	_nav_update_timer -= get_physics_process_delta_time()
+	if _nav_update_timer <= 0.0:
+		_nav_update_timer = NAV_UPDATE_INTERVAL
+		_nav_agent.target_position = target_pos
+		if not _nav_agent.is_navigation_finished():
+			var next_pos: Vector3 = _nav_agent.get_next_path_position()
+			var dir: Vector3 = next_pos - global_position
+			dir.y = 0.0
+			if dir.length_squared() > 0.01:
+				_cached_nav_direction = dir.normalized()
+			else:
+				_cached_nav_direction = Vector3.ZERO
+		else:
+			_cached_nav_direction = Vector3.ZERO
+	if _cached_nav_direction == Vector3.ZERO:
 		velocity = Vector3.ZERO
 		return
-	var next_pos: Vector3 = _nav_agent.get_next_path_position()
-	var dir: Vector3 = next_pos - global_position
-	dir.y = 0.0
-	if dir.length_squared() <= 0.01:
-		velocity = Vector3.ZERO
-		return
-	var n_dir := dir.normalized()
-	velocity = n_dir * speed
-	_face_direction(n_dir)
+	velocity = _cached_nav_direction * speed
+	_face_direction(_cached_nav_direction)
 
 
 func _update_attack(delta: float, player: Node3D) -> void:
@@ -446,6 +479,7 @@ func can_see_player(player: Node3D) -> bool:
 	to_player.y = 0.0
 	var distance := to_player.length()
 	if distance > view_range:
+		_cached_can_see_player = false
 		return false
 	if distance <= 0.01:
 		return true
@@ -456,8 +490,14 @@ func can_see_player(player: Node3D) -> bool:
 		facing = Vector3.FORWARD
 	var angle := rad_to_deg(facing.normalized().angle_to(to_player.normalized()))
 	if angle > view_angle * 0.5:
+		_cached_can_see_player = false
 		return false
-	return _has_clear_line_to_player(player)
+	# 射线检测部分节流
+	_vision_check_timer -= get_physics_process_delta_time()
+	if _vision_check_timer <= 0.0:
+		_vision_check_timer = VISION_CHECK_INTERVAL
+		_cached_can_see_player = _has_clear_line_to_player(player)
+	return _cached_can_see_player
 
 
 func _has_clear_line_to_player(player: Node3D) -> bool:

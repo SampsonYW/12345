@@ -4,6 +4,7 @@
 # [AI-ASSISTED] 2026-05-21 - Fix enemies spawning on obstacles.
 # [AI-ASSISTED] 2026-05-22 - Add spawn_occurred signal for HUD pulse (polish_plan §4)
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
+# [AI-ASSISTED] 2026-05-24 — 刷怪性能优化：budget 上限、冷却间隔、分帧初始生成
 extends Node3D
 
 signal spawn_occurred(position: Vector3, kind: String)
@@ -30,6 +31,9 @@ const DEFAULT_SPAWN_POINTS := [
 @export var obstacle_collision_mask: int = 4
 @export var obstacle_clear_radius: float = 2.5
 
+const MAX_SPAWN_BUDGET := 5.0
+const SPAWN_COOLDOWN := 0.15
+
 var spawn_curve := [
 	[0.0, 0.0],
 	[30.0, 2.0],
@@ -51,6 +55,7 @@ var _spawn_points: Array[Vector3] = []
 var _visible_avoidance_center: Vector3 = Vector3.ZERO
 var _visible_avoidance_radius: float = 0.0
 var _last_spawn_point: Vector3 = Vector3.ZERO
+var _spawn_cooldown: float = 0.0
 
 
 func _ready() -> void:
@@ -66,12 +71,17 @@ func _process(delta: float) -> void:
 	var spm := get_current_spawns_per_minute()
 	if spm <= 0.0:
 		return
-	_spawn_budget += spm * delta / 60.0
+	_spawn_budget = minf(_spawn_budget + spm * delta / 60.0, MAX_SPAWN_BUDGET)
+	_spawn_cooldown -= delta
+	if _spawn_cooldown > 0.0:
+		return
 	var spawned_this_frame := 0
-	while _spawn_budget >= 1.0 and spawned_this_frame < 3:
+	while _spawn_budget >= 1.0 and spawned_this_frame < 2:
 		spawn_enemy(GameManager.elapsed_time, GameManager.get_erosion_tier())
 		_spawn_budget -= 1.0
 		spawned_this_frame += 1
+	if spawned_this_frame > 0:
+		_spawn_cooldown = SPAWN_COOLDOWN
 
 
 func configure(enemy_parent: Node, patrol_scene: PackedScene, dormant_scene: PackedScene) -> void:
@@ -88,7 +98,12 @@ func seed_initial_enemies() -> void:
 	if _initial_spawned:
 		return
 	_initial_spawned = true
+	var queue: Array = _collect_initial_spawn_data()
+	_deferred_spawn_queue(queue)
 
+
+func _collect_initial_spawn_data() -> Array:
+	var queue: Array = []
 	var map := get_parent().get_node_or_null("World/ExpeditionMap") if get_parent() != null else null
 	if map == null and get_tree().current_scene != null:
 		map = get_tree().current_scene.get_node_or_null("World/ExpeditionMap")
@@ -98,28 +113,41 @@ func seed_initial_enemies() -> void:
 			if spawn is Node3D:
 				var is_dormant = spawn.name.to_lower().contains("dormant")
 				var scene = _dormant_scene if is_dormant else _patrol_scene
-				_spawn_fixed(scene, spawn.global_position)
-		return
-
-	# Fallback: spawn enemies at hardcoded positions (used when .tscn has no InitialSpawns)
+				queue.append({"scene": scene, "position": spawn.global_position})
+		return queue
+	# Fallback: hardcoded positions (used when .tscn has no InitialSpawns)
 	# --- Low risk: Ash Outskirts ---
-	_spawn_fixed(_patrol_scene, Vector3(-160.0, 0.0, -30.0))
-	_spawn_fixed(_dormant_scene, Vector3(-140.0, 0.0, 50.0))
+	queue.append({"scene": _patrol_scene, "position": Vector3(-160.0, 0.0, -30.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(-140.0, 0.0, 50.0)})
 	# --- Low risk: Broken Rail ---
-	_spawn_fixed(_patrol_scene, Vector3(-20.0, 0.0, -40.0))
-	_spawn_fixed(_dormant_scene, Vector3(30.0, 0.0, -60.0))
+	queue.append({"scene": _patrol_scene, "position": Vector3(-20.0, 0.0, -40.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(30.0, 0.0, -60.0)})
 	# --- High risk: Black Yard ---
-	_spawn_fixed(_patrol_scene, Vector3(100.0, 0.0, -30.0))
-	_spawn_fixed(_patrol_scene, Vector3(170.0, 0.0, 10.0))
-	_spawn_fixed(_dormant_scene, Vector3(125.0, 0.0, -45.0))
-	_spawn_fixed(_dormant_scene, Vector3(155.0, 0.0, -15.0))
-	_spawn_fixed(_dormant_scene, Vector3(195.0, 0.0, 35.0))
-	_spawn_fixed(_dormant_scene, Vector3(145.0, 0.0, 55.0))
+	queue.append({"scene": _patrol_scene, "position": Vector3(100.0, 0.0, -30.0)})
+	queue.append({"scene": _patrol_scene, "position": Vector3(170.0, 0.0, 10.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(125.0, 0.0, -45.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(155.0, 0.0, -15.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(195.0, 0.0, 35.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(145.0, 0.0, 55.0)})
 	# --- High risk: Core Wreck ---
-	_spawn_fixed(_patrol_scene, Vector3(40.0, 0.0, 65.0))
-	_spawn_fixed(_patrol_scene, Vector3(25.0, 0.0, 85.0))
-	_spawn_fixed(_dormant_scene, Vector3(55.0, 0.0, 75.0))
-	_spawn_fixed(_dormant_scene, Vector3(10.0, 0.0, 90.0))
+	queue.append({"scene": _patrol_scene, "position": Vector3(40.0, 0.0, 65.0)})
+	queue.append({"scene": _patrol_scene, "position": Vector3(25.0, 0.0, 85.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(55.0, 0.0, 75.0)})
+	queue.append({"scene": _dormant_scene, "position": Vector3(10.0, 0.0, 90.0)})
+	return queue
+
+
+func _deferred_spawn_queue(queue: Array) -> void:
+	var index := 0
+	var per_frame := 2
+	while index < queue.size():
+		var batch_end := mini(index + per_frame, queue.size())
+		for i in range(index, batch_end):
+			var data: Dictionary = queue[i]
+			_spawn_fixed(data["scene"], data["position"])
+		index = batch_end
+		if index < queue.size():
+			await get_tree().process_frame
 
 
 func spawn_enemy(elapsed: float, tier: int) -> Node3D:
