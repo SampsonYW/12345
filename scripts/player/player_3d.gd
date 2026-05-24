@@ -53,11 +53,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			NoiseManager.emit_noise(global_position, NoiseManager.Level.MEDIUM)
 		return
 
-	for i in 8:
-		if event.is_action_pressed("use_slot_%d" % (i + 1)):
-			_use_inventory_slot(i)
-			return
-
 
 func get_aim_direction() -> Vector3:
 	return _aim_direction

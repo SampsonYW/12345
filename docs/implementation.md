@@ -220,14 +220,14 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 - **瞄准**：每帧把鼠标位置反投射到 `Y=player.y` 平面，得到瞄准方向；如果鼠标读不到（headless 测试）退化为最后一次移动方向。`look_at` 让模型朝向瞄准方向。`get_aim_direction()` 供 PlayerShooting 和 FogOfWar 查询。
 - **冲刺**：单次 1 秒、CD 3 秒，触发时调 `NoiseManager.emit_noise(MEDIUM)`。
 - **信号弹**：`signal_flare` 按键 → 调 `GameManager.fire_signal_flare(pos)`，成功后再调 `NoiseManager.emit_noise(GLOBAL)` 并生成 4 秒视觉标记。
-- **快捷键 1–8**：按下后调 `$Inventory.use_slot(i)`。
+- **快捷键 1–8**：已移至 HUD 处理（见 §10.1 #11），仅在背包/仓库/容器搜索弹层打开时生效。Player3D 不再处理物品使用快捷键。
 - **边界 clamp**：根据 `GameManager.current_location` 在母车甲板用固定矩形 clamp，远征用 `Game3D.get_expedition_bounds()` 反查 ExpeditionMap 边界。
 - **输入锁**：`is_input_locked` 反映 `GameManager.ui_blocking_input`；锁住时移动/射击/信号弹都不响应。
 
 ### 4.3 耦合
 
 - **下游**（玩家被调用）：HUD 通过 `_bind_player_refs()` 拿到 Player 下的 `Inventory / PlayerHealth / PlayerShooting` 三个子节点直接连信号。Enemy 通过 `get_tree().get_first_node_in_group("player")` 拿玩家算视野/追击/攻击。Bullet 不直接引用 Player，但起点由 PlayerShooting 取自 `FirePoint`。
-- **上游**：调 GameManager / NoiseManager / Inventory.use_slot。
+- **上游**：调 GameManager / NoiseManager。
 - ⚠️ Player 直接 `get_tree().current_scene.has_method("get_expedition_bounds")` 反查地图边界——这是 Player → Game3D 的反向耦合，让 Player 知道 Game3D 暴露这个方法。改 Player 边界 clamp 时要同步 `Game3D.get_expedition_bounds`。
 
 ---
@@ -375,7 +375,7 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 8. **屏幕边缘警戒指示** — `_alert_indicators` 把 ALERT_DETECTION_RANGE 内觉醒的敌人画成屏幕边缘红点
 9. **刷怪脉冲** — 监听 `SpawnManager.spawn_occurred`，在敌人方向上画一次性脉冲
 10. **小地图** — `_minimap = Minimap.new()`，绘制由 Minimap 类自己处理
-11. **键盘输入劫持** — `_unhandled_input` 响应：B（开/关背包 overlay）、ESC（关闭任意 overlay）、Enter/Space（在主菜单/结果弹层时确认）。**注意**：`use_slot_1..8` 数字键由 Player3D 处理直接对应背包槽位，HUD 不再劫持（2026-05-23 之前曾用 `SHORTCUT_KEYS` 在 overlay 打开时把 1-8 劫持成"快速转移容器/仓库第 N 项"，已删除——参见 §19.4 已修复案例）。
+11. **键盘输入劫持** — `_unhandled_input` 响应：B（开/关背包 overlay）、ESC（关闭任意 overlay）、Enter/Space（在主菜单/结果弹层时确认）、**数字键 1–8（仅在 blocking overlay 打开时）调 `Inventory.use_slot(i)` 消耗对应槽位物品并刷新背包格**。数字键只在背包/仓库/容器搜索弹层打开时生效，关闭时不响应——确保玩家只能在看到背包内容的情况下使用物品。
 12. **结算屏接管** — `_update_end_flow` 在 SUCCESS/DEAD 进入时**强制关闭任意激活的 blocking overlay**（背包/仓库/容器搜索）+ 隐藏 main_overlay + 隐藏运行时 HUD + 显示 result_overlay。强制关闭这一步是必须的——否则玩家在 loot 界面里被打死时 overlay 会挡住 result_overlay，UI 卡住。
 
 ### 10.2 内部状态字段（直接节点引用 + 数据缓存共 70+ 变量）

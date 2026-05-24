@@ -188,6 +188,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_mark_input_as_handled()
 		close_blocking_overlay()
 		return
+	if _active_blocking_overlay != null and _inventory != null:
+		for i in 8:
+			if event.is_action_pressed("use_slot_%d" % (i + 1)):
+				_mark_input_as_handled()
+				_inventory.use_slot(i)
+				var grid := _get_visible_backpack_grid()
+				if grid != null:
+					_populate_backpack_grid(grid)
+				return
 
 
 func _restore_launch_screen() -> void:
@@ -411,7 +420,7 @@ func _build_backpack_overlay() -> Control:
 	content.add_child(_make_overlay_title("背包"))
 	var grid := _make_backpack_grid()
 	content.add_child(grid)
-	content.add_child(_make_hint_label("按 Esc 或 B 关闭。关闭后快捷键仍可使用。"))
+	content.add_child(_make_hint_label("按 Esc 或 B 关闭。数字键 1-8 或右键可使用物品。"))
 	return overlay
 
 
