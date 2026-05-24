@@ -72,7 +72,8 @@ project/
 │   │   └── item_pickup_3d.gd
 │   ├── systems/
 │   │   ├── fog_of_war.gd          # 实际是"可视视野"，文件名沿用
-│   │   └── extraction.gd          # 信号弹后的等待 → 母车 → 登船流程
+│   │   ├── extraction.gd          # 信号弹后的等待 → 母车 → 登船流程
+│   │   └── camera_occlusion.gd    # 摄像机遮挡体积检测与墙体透明化
 │   ├── maps/
 │   │   ├── afterglow_map.gd       # 母车甲板交互（仓库、出发点）
 │   │   ├── expedition_map.gd      # 远征地图：调度 POI 注册表
@@ -133,6 +134,7 @@ Game3D (Node3D)                       — scripts/game_3d.gd
 ├── SpawnManager                      — scripts/managers/spawn_manager.gd
 ├── Extraction                        — scripts/systems/extraction.gd
 ├── FogOfWar                          — 实例化自 fog_of_war.tscn
+├── CameraOcclusion                   — scripts/systems/camera_occlusion.gd
 └── UI (CanvasLayer)
     └── HUD                           — scripts/ui/hud.gd
 ```
@@ -270,14 +272,14 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 
 ### 6.1 实现
 
-文件 `scripts/enemies/enemy_3d.gd`（约 730 行）。一个脚本覆盖两种敌人：通过 `enemy_type: EnemyType { PATROL, DORMANT }` 区分初始状态：
+文件 `scripts/enemies/enemy_3d.gd`（约 606 行）。一个脚本覆盖两种敌人：通过 `enemy_type: EnemyType { PATROL, DORMANT }` 区分初始状态：
 
 - PATROL 起始 `State = PATROL`，`is_awake = true`，在 home 附近随机巡逻；看到玩家直接 `force_awaken → CHASE`。
 - DORMANT 起始 `State = SLEEP`，`is_awake = false`，靠 `receive_noise` 累积警戒值；达到 `alert_threshold` 唤醒进 CHASE。
 
 状态机：`SLEEP / PATROL / CHASE / ATTACK`。每帧 `_physics_process` 按状态推进 + `move_and_slide()` + `global_position.y = 0.0`（防止爬障碍）。
 
-视觉：自建 `AlertBar`（橙色警戒条）+ `HpBar`（红色血条）两个跟随节点。
+视觉：自建 `AlertBar`（橙色警戒条）+ `HpBar`（红色血条）两个跟随节点。两个 bar 节点设置 `top_level = true` 脱离敌人旋转，由 `_billboard_bars()` 每 0.1s 手动设置 `global_position`（跟随敌人）和 `global_transform.basis`（对齐摄像机朝向），保证在斜俯视正交摄像机下始终正面可见。
 
 ### 6.2 关键耦合
 
@@ -302,15 +304,15 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 
 **视线检测**（`_has_clear_line_to_player` / `_has_clear_line_to_point`，y=0.7 高度射线，`vision_obstacle_mask = 4` 只看高墙）：用于「发现玩家」/「信号弹分支判断能否看到玩家」。箱子和矮障碍**不挡视线**，巡逻怪可以透过箱子/矮障碍发现玩家。
 
-**追击移动**：`_update_chase` 和 `_update_signal_focus` 通过 `_nav_move_toward(target_pos, speed)` 委托给 NavigationAgent3D 寻路（详见 §15.3）。NavAgent 用 NavMesh 给出几何精确的 path，自动绕开高墙/矮障碍/箱子——不再需要手写 A*/直线-绕路 分支判断。`_update_chase` 流程简化为：
+**巡逻移动**：`_update_patrol` 同样通过 `_nav_move_toward(_patrol_target, patrol_speed)` 委托给 NavigationAgent3D 寻路。巡逻目标点通过 `_pick_patrol_target()` 在 `_home_position` 附近随机生成，并用 `NavigationServer3D.map_get_closest_point()` 吸附到 NavMesh 可走多边形上，确保目标永远不会落在墙内或不可达区域。到达后自动选取下一个随机点。
+
+**追击移动**：`_update_chase` 和 `_update_signal_focus` 同样通过 `_nav_move_toward(target_pos, speed)` 委托给 NavigationAgent3D 寻路（详见 §15.3）。NavAgent 用 NavMesh 给出几何精确的 path，自动绕开高墙/矮障碍/箱子——不再需要手写 A*/直线-绕路 分支判断。`_update_chase` 流程简化为：
 
 1. 有 `_has_signal_focus` 且看不到玩家 → 走 `_update_signal_focus(delta)` 追信号弹；能看到玩家时清掉 focus 转正常追。
 2. 距离 ≤ `attack_range` → 切 ATTACK。
 3. 否则 `_nav_move_toward(player.global_position, chase_speed)`：设 `agent.target_position` 并沿 `agent.get_next_path_position()` 移动。
 
-**局部避障**（`_has_obstacle_ahead` / `_get_avoidance_direction`，用 `movement_obstacle_mask = 84`）：只在 `_update_patrol` 用——巡逻路径是随机点，没有寻路保证，需要避开撞上的矮障碍/箱子/墙。
 
-**卡住恢复** `_try_stuck_recovery`（巡逻状态用）：每帧把 `global_position` 压栈到 `_last_positions[0..10]`；若头尾位移² < 0.01 就触发，随机选一个侧向 ±90° 方向跑 0.3s。
 
 ### 6.4 AI 性能优化（节流）
 
@@ -318,10 +320,9 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 
 | 子系统 | 间隔 | 常量 | 说明 |
 |--------|------|------|------|
-| 寻路（追击/信号弹） | 0.2s | `NAV_UPDATE_INTERVAL` | 每 0.2s 更新一次 `target_position` + `get_next_path_position()`，中间帧沿 `_cached_nav_direction` 继续移动 |
+| 寻路（巡逻/追击/信号弹） | 0.2s | `NAV_UPDATE_INTERVAL` | 每 0.2s 更新一次 `target_position` + `get_next_path_position()`，中间帧沿 `_cached_nav_direction` 继续移动 |
 | 视线射线检测 | 0.15s | `VISION_CHECK_INTERVAL` | `can_see_player()` 中距离/角度每帧检查（廉价），射线遮挡检查节流，结果缓存到 `_cached_can_see_player` |
-| 巡逻避障射线 | 0.1s | `OBSTACLE_CHECK_INTERVAL` | `_has_obstacle_ahead()` 节流，结果缓存到 `_cached_obstacle_ahead` |
-| Billboard 朝向 | 0.1s | `BILLBOARD_INTERVAL` | 警戒条/血条面向摄像机的 `look_at` 计算节流 |
+| Billboard 朝向 | 0.1s | `BILLBOARD_INTERVAL` | 警戒条/血条位置跟随 + basis 对齐摄像机（`top_level=true`，不用 `look_at`） |
 
 所有定时器在 `_ready()` 中用 `randf() * INTERVAL` 初始化随机偏移，使 32 个敌人的检测分散到不同帧，避免同帧集中触发。
 
@@ -585,6 +586,16 @@ Run 结束（SUCCESS 或 DEAD）后，通过 HUD 结算屏 → `GameManager.retu
 
 ---
 
+## 13.5 摄像机遮挡透明化（CameraOcclusion）
+
+新增的独立系统节点，用于解决玩家移动到墙体后方时视线被遮挡的问题。
+实现机制为体积扫描（ShapeCast3D）+ 材质平滑插值：
+- **扫描区域**：在 `_physics_process` 中，使用半径 `1.5m` 的 `SphereShape3D`，从 `Camera3D` 向玩家胸口（Y=1.0）发射体积扫描，形成一个贯穿的圆柱形检测区域。
+- **目标过滤**：只碰撞 `collision_mask = 68`（高障碍 + 矮障碍）。
+- **平滑插值**：对扫中的所有障碍物，将其内部 `MeshInstance3D` 的材质临时开启 `TRANSPARENCY_ALPHA`，并通过 `move_toward` 每一帧将 `albedo_color.a` 降至 `0.3`。当障碍物离开扫描区域后，Alpha 恢复至 `1.0`，并彻底关闭 `TRANSPARENCY_DISABLED` 以保证渲染性能和深度排序。
+
+---
+
 ## 14. 输入映射
 
 由 `project.godot [input]` 段定义。
@@ -638,11 +649,11 @@ Run 结束（SUCCESS 或 DEAD）后，通过 HUD 结算屏 → `GameManager.retu
 | 矮障碍 (sy≤1.0) | 64 | 0 | 挡玩家/敌人，不挡子弹/视线 |
 | 地面/POI 外墙 | 4 | 0 | 同高障碍 |
 
-敌人 AI 用两套 mask 分工（详见 §6.3）：
-- `vision_obstacle_mask = 4`：视线检测，只看高墙——箱子和矮障碍都不挡视线
-- `movement_obstacle_mask = 84` (= 4+16+64)：移动直达/避障/前方探障——AI 主动绕开三类
+敌人 AI 的 mask 分工（详见 §6.3）：
+- `vision_obstacle_mask = 4`：视线检测射线，只看高墙——箱子和矮障碍都不挡视线
+- 移动避障：全部交给 NavigationAgent3D + NavMesh 处理（NavMesh `geometry_collision_mask = 84`），脚本不再持有 `movement_obstacle_mask`
 
-NavigationMesh 资源用 `geometry_collision_mask = 84` 同步识别这三类（详见 §15.3）。刷怪点地面检测 mask = `4`。
+NavigationMesh 资源用 `geometry_collision_mask = 84` (= 4+16+64) 识别高障碍/容器/矮障碍三类（详见 §15.3）。刷怪点地面检测 mask = `4`。
 
 ### 15.2 Groups
 

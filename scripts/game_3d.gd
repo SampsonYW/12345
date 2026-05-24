@@ -12,6 +12,7 @@ const AFTERGLOW_MAP_SCENE := preload("res://scenes/afterglow_map.tscn")
 const EXTRACTION_SCRIPT := preload("res://scripts/systems/extraction.gd")
 const FOG_OF_WAR_SCENE := preload("res://scenes/fog_of_war.tscn")
 const SPAWN_MANAGER_SCRIPT := preload("res://scripts/managers/spawn_manager.gd")
+const CAMERA_OCCLUSION_SCRIPT := preload("res://scripts/systems/camera_occlusion.gd")
 
 const CAMERA_OFFSET := Vector3(0.0, 18.0, 18.0)
 
@@ -35,6 +36,7 @@ func _ready() -> void:
 	_add_spawn_manager()
 	_add_fog_of_war()
 	_add_extraction_system()
+	_add_camera_occlusion_system()
 	if not GameManager.state_changed.is_connected(_on_game_state_changed):
 		GameManager.state_changed.connect(_on_game_state_changed)
 	if not GameManager.location_changed.is_connected(_on_location_changed):
@@ -145,6 +147,15 @@ func _add_extraction_system() -> void:
 	extraction.name = "Extraction"
 	extraction.set_script(EXTRACTION_SCRIPT)
 	add_child(extraction)
+
+
+func _add_camera_occlusion_system() -> void:
+	if get_node_or_null("CameraOcclusion") != null:
+		return
+	var occlusion := Node3D.new()
+	occlusion.name = "CameraOcclusion"
+	occlusion.set_script(CAMERA_OCCLUSION_SCRIPT)
+	add_child(occlusion)
 
 
 func _add_spawn_manager() -> void:

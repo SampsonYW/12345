@@ -54,7 +54,7 @@ godot_*.log
 *.fdb_latexmk
 
 # Test scripts are run directly; Godot can regenerate these local UID sidecars.
-tests/*.gd.uid
+*.uid
 
 # VScode settings
 .vscode/settings.json

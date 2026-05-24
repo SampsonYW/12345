@@ -4,7 +4,8 @@
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 # [AI-ASSISTED] 2026-05-23 — 追击/信号弹寻路升级为 A* 网格寻路（绕墙/拐角）
 # [AI-ASSISTED] 2026-05-24 — 寻路迁移到 Godot NavigationServer3D + NavigationAgent3D，删除自建 A*
-# [AI-ASSISTED] 2026-05-24 — 敌人AI性能优化：寻路/视线/避障/billboard 节流
+# [AI-ASSISTED] 2026-05-24 — 敌人AI性能优化：寻路/视线/billboard 节流
+# [AI-ASSISTED] 2026-05-24 — 巡逻寻路改用 NavigationAgent3D，修复撞墙/摩擦
 extends CharacterBody3D
 
 signal died(enemy: CharacterBody3D)
@@ -23,7 +24,6 @@ const HP_BAR_HEIGHT := 0.08
 const HP_BAR_DEPTH := 0.04
 const NAV_UPDATE_INTERVAL := 0.2
 const VISION_CHECK_INTERVAL := 0.15
-const OBSTACLE_CHECK_INTERVAL := 0.1
 const BILLBOARD_INTERVAL := 0.1
 
 @export var alert_threshold: float = 100.0
@@ -37,7 +37,7 @@ const BILLBOARD_INTERVAL := 0.1
 @export var view_angle: float = 60.0
 @export var view_range: float = 8.0
 @export var vision_obstacle_mask: int = 4
-@export var movement_obstacle_mask: int = 84
+
 @export var attack_range: float = 1.5
 @export var attack_cooldown: float = 1.0
 
@@ -57,18 +57,12 @@ var _hp_bar_fill: MeshInstance3D = null
 var _game_manager_cache: Node = null
 var _has_signal_focus: bool = false
 var _signal_focus_position: Vector3 = Vector3.ZERO
-var _stuck_timer: float = 0.0
-var _last_positions: Array[Vector3] = []
-var _obstacle_avoidance_cooldown: float = 0.0
-var _current_avoidance_dir: Vector3 = Vector3.ZERO
-var _patrol_retry_count: int = 0
+
 var _nav_agent: NavigationAgent3D = null
 var _nav_update_timer: float = 0.0
 var _cached_nav_direction: Vector3 = Vector3.ZERO
 var _vision_check_timer: float = 0.0
 var _cached_can_see_player: bool = false
-var _obstacle_check_timer: float = 0.0
-var _cached_obstacle_ahead: bool = false
 var _billboard_timer: float = 0.0
 
 
@@ -88,7 +82,6 @@ func _ready() -> void:
 	# 错开各敌人的定时器，分散同帧计算压力
 	_nav_update_timer = randf() * NAV_UPDATE_INTERVAL
 	_vision_check_timer = randf() * VISION_CHECK_INTERVAL
-	_obstacle_check_timer = randf() * OBSTACLE_CHECK_INTERVAL
 	_billboard_timer = randf() * BILLBOARD_INTERVAL
 
 
@@ -106,14 +99,6 @@ func _physics_process(delta: float) -> void:
 	if not _is_gameplay_active():
 		velocity = Vector3.ZERO
 		return
-
-	# 卡住检测：记录最近位置，判断是否移动
-	_stuck_timer -= delta
-	_obstacle_avoidance_cooldown -= delta
-	_last_positions.push_front(global_position)
-	if _last_positions.size() > 10:
-		_last_positions.resize(10)
-
 	var player := _get_player()
 	if player == null:
 		if _has_signal_focus:
@@ -226,38 +211,20 @@ func react_to_signal_flare(origin: Vector3, extraction_position: Vector3 = Vecto
 		_state = State.CHASE
 
 
-func _update_patrol(player: Node3D, delta: float) -> void:
+func _update_patrol(player: Node3D, _delta: float) -> void:
 	if can_see_player(player):
 		force_awaken()
 		return
 
-	if _try_stuck_recovery(delta):
-		return
-
+	# 用 NavigationAgent3D 判断是否到达当前巡逻点
+	if _nav_agent != null and _nav_agent.is_navigation_finished():
+		_pick_patrol_target()
 	var to_target: Vector3 = _patrol_target - global_position
 	to_target.y = 0.0
-	if to_target.length() <= 0.4:
+	if to_target.length() <= 0.5:
 		_pick_patrol_target()
-		to_target = _patrol_target - global_position
-		to_target.y = 0.0
 
-	# 节流障碍物检测
-	_obstacle_check_timer -= delta
-	if _obstacle_check_timer <= 0.0:
-		_obstacle_check_timer = OBSTACLE_CHECK_INTERVAL
-		_cached_obstacle_ahead = _has_obstacle_ahead(to_target, patrol_speed * delta)
-
-	if _cached_obstacle_ahead:
-		# 前方有障碍物，选择侧向偏移方向
-		var avoid_dir := _get_avoidance_direction(to_target)
-		_move_flat(avoid_dir, patrol_speed * 0.7)
-		_patrol_retry_count += 1
-		if _patrol_retry_count > 5:
-			_pick_patrol_target()
-			_patrol_retry_count = 0
-	else:
-		_patrol_retry_count = 0
-		_move_flat(to_target, patrol_speed)
+	_nav_move_toward(_patrol_target, patrol_speed)
 
 
 func _update_chase(player: Node3D, delta: float) -> void:
@@ -356,25 +323,19 @@ func _face_direction(direction: Vector3) -> void:
 
 
 func _pick_patrol_target() -> void:
-	# 如果卡在障碍物上多次重试，缩小巡逻半径
-	if _patrol_retry_count > 3:
-		_patrol_retry_count = 0
-		# 尝试远离当前位置的方向
-		var away := global_position - _home_position
-		away.y = 0.0
-		if away.length_squared() > 0.01:
-			away = away.normalized() * patrol_radius * 0.5
-			_patrol_target = global_position + away
-		else:
-			_patrol_target = global_position + Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0)) * patrol_radius
-		return
-
 	var offset := Vector3(
 		randf_range(-patrol_radius, patrol_radius),
 		0.0,
 		randf_range(-patrol_radius, patrol_radius)
 	)
-	_patrol_target = _home_position + offset
+	var candidate := _home_position + offset
+	# 将候选点吸附到 NavMesh 上，避免落在墙内
+	if _nav_agent != null:
+		var map_rid := _nav_agent.get_navigation_map()
+		if map_rid.is_valid():
+			candidate = NavigationServer3D.map_get_closest_point(map_rid, candidate)
+	_patrol_target = candidate
+	_patrol_target.y = 0.0
 
 
 func _deal_damage(player: Node3D) -> void:
@@ -382,94 +343,6 @@ func _deal_damage(player: Node3D) -> void:
 	if ph and ph.has_method("take_damage"):
 		ph.take_damage(get_scaled_damage())
 
-
-## 卡住检测与恢复
-## 如果一段时间内位置没有明显变化，尝试侧向移动脱离
-func _is_stuck() -> bool:
-	if _last_positions.size() < 10:
-		return false
-	var first := _last_positions[0]
-	var last := _last_positions[_last_positions.size() - 1]
-	return first.distance_squared_to(last) < 0.01
-
-
-func _try_stuck_recovery(delta: float) -> bool:
-	if not _is_stuck():
-		_stuck_timer = 0.5
-		return false
-	_stuck_timer -= delta
-	if _stuck_timer > 0.0:
-		return false
-
-	# 卡住了，尝试随机侧向偏移
-	if _obstacle_avoidance_cooldown <= 0.0:
-		var avoid_angle := randf_range(-PI * 0.5, PI * 0.5)
-		var forward := velocity.normalized() if velocity.length_squared() > 0.01 else Vector3.FORWARD
-		var right := forward.cross(Vector3.UP).normalized()
-		_current_avoidance_dir = (forward * cos(avoid_angle) + right * sin(avoid_angle)).normalized()
-		_obstacle_avoidance_cooldown = 0.3
-
-	var speed := patrol_speed if _state == State.PATROL else chase_speed
-	_move_flat(_current_avoidance_dir, speed * 0.6)
-	_stuck_timer = 0.5
-	return true
-
-
-## 检测前方是否有障碍物
-## 沿移动方向投射一个短距离射线
-func _has_obstacle_ahead(move_dir: Vector3, look_ahead: float) -> bool:
-	if move_dir.length_squared() <= 0.01 or look_ahead <= 0.0:
-		return false
-	var world := get_world_3d()
-	if world == null:
-		return false
-	var space_state := world.direct_space_state
-	if space_state == null:
-		return false
-
-	var dir := move_dir.normalized()
-	var origin := global_position + Vector3.UP * 0.5
-	var end := origin + dir * look_ahead * 2.0
-	var query := PhysicsRayQueryParameters3D.create(origin, end, movement_obstacle_mask)
-	query.exclude = [get_rid()]
-	var result := space_state.intersect_ray(query)
-	return not result.is_empty()
-
-
-## 获取避障方向
-## 尝试左右两个方向，选择无障碍物的一侧
-func _get_avoidance_direction(original_dir: Vector3) -> Vector3:
-	var world := get_world_3d()
-	if world == null:
-		return original_dir
-	var space_state := world.direct_space_state
-	if space_state == null:
-		return original_dir
-
-	var forward := original_dir.normalized()
-	var right := forward.cross(Vector3.UP).normalized()
-	var origin := global_position + Vector3.UP * 0.5
-	var look_dist := 2.0
-
-	# 尝试左、右、左后、右后
-	var attempts: Array[Vector3] = [
-		-forward,           # 后退
-		right,              # 右
-		-right,             # 左
-		forward + right,    # 右前
-		forward - right,    # 左前
-		-forward + right,   # 右后
-		-forward - right,   # 左后
-	]
-	for attempt in attempts:
-		var dir := attempt.normalized()
-		var end := origin + dir * look_dist
-		var query := PhysicsRayQueryParameters3D.create(origin, end, movement_obstacle_mask)
-		query.exclude = [get_rid()]
-		var result := space_state.intersect_ray(query)
-		if result.is_empty():
-			return dir
-	return -forward  # 所有方向都被阻挡，后退
 
 
 func can_see_player(player: Node3D) -> bool:
@@ -578,6 +451,7 @@ func _ensure_alert_bar() -> void:
 		_alert_bar.position = Vector3(0.0, 1.65, 0.0)
 		add_child(_alert_bar)
 	if _alert_bar != null:
+		_alert_bar.top_level = true
 		_ensure_alert_bar_meshes()
 		if _alert_bar_fill != null and _alert_bar_fill.material_override != null:
 			_alert_bar_fill.material_override = _alert_bar_fill.material_override.duplicate()
@@ -604,6 +478,7 @@ func _ensure_hp_bar() -> void:
 		_hp_bar.position = Vector3(0.0, 1.82, 0.0)
 		add_child(_hp_bar)
 	if _hp_bar != null:
+		_hp_bar.top_level = true
 		_ensure_hp_bar_meshes()
 		if _hp_bar_fill != null and _hp_bar_fill.material_override != null:
 			_hp_bar_fill.material_override = _hp_bar_fill.material_override.duplicate()
@@ -621,20 +496,21 @@ func _update_hp_bar() -> void:
 
 
 ## 让血条和警戒条始终面向摄像机（billboard 效果）
+## 使用 top_level 让 bar 脱离敌人旋转，直接设置全局位置跟随敌人 +
+## 全局朝向对齐摄像机 basis，保证在斜俯视正交摄像机下始终正面可见。
 func _billboard_bars() -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
-	var cam_pos := cam.global_position
-	for bar in [_alert_bar, _hp_bar]:
+	var cam_basis := cam.global_transform.basis
+	for bar_info in [[_alert_bar, 1.65], [_hp_bar, 1.82]]:
+		var bar: Node3D = bar_info[0] as Node3D
+		var y_offset: float = bar_info[1]
 		if bar == null or not is_instance_valid(bar):
 			continue
-		var node: Node3D = bar as Node3D
-		var bar_pos: Vector3 = node.global_position
-		var dir: Vector3 = cam_pos - bar_pos
-		dir.y = 0.0
-		if dir.length_squared() > 0.01:
-			node.look_at(bar_pos + dir, Vector3.UP)
+		# top_level=true 使 bar 不继承父节点变换，手动跟随敌人位置
+		bar.global_position = global_position + Vector3(0.0, y_offset, 0.0)
+		bar.global_transform.basis = cam_basis
 
 
 func _die() -> void:
