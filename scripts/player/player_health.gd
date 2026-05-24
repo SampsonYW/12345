@@ -4,7 +4,7 @@
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node
 
-signal damaged
+signal damaged(damage_amount: float)
 signal died
 signal health_changed(current: float, maximum: float)
 
@@ -34,7 +34,7 @@ func take_damage(amount: float) -> void:
 	iframe_timer = iframe_duration
 	GameManager.add_erosion(GameManager.HIT_EROSION_AMOUNT)
 	health_changed.emit(current_hp, max_hp)
-	damaged.emit()
+	damaged.emit(amount)
 	if current_hp <= 0.0:
 		_die()
 

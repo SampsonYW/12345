@@ -9,6 +9,8 @@ extends CharacterBody3D
 @export var sprint_duration: float = 1.0
 @export var sprint_cooldown: float = 3.0
 
+const FLARE_MARKER_SCENE := preload("res://scenes/signal_flare_marker.tscn")
+
 var _sprint_timer: float = 0.0
 var _cooldown_timer: float = 0.0
 var _is_sprinting: bool = false
@@ -128,9 +130,6 @@ func _fire_signal_flare() -> void:
 	if GameManager.fire_signal_flare(global_position):
 		NoiseManager.emit_noise(global_position, NoiseManager.Level.GLOBAL)
 		_spawn_signal_flare_marker()
-
-
-const FLARE_MARKER_SCENE := preload("res://scenes/signal_flare_marker.tscn")
 
 
 func _spawn_signal_flare_marker() -> void:

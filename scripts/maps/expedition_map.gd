@@ -61,7 +61,7 @@ func _ready() -> void:
 	_build_pois()
 	_pois_built = true
 	if Engine.is_editor_hint():
-		print("[expedition_map] @tool editor preview built. 保存场景 (Ctrl+S) 可把 .tscn 里旧节点的清理永久落盘；POI 生成节点不会被保存。")
+		push_warning("[expedition_map] @tool editor preview built. 保存场景 (Ctrl+S) 可把 .tscn 里旧节点的清理永久落盘；POI 生成节点不会被保存。")
 
 
 ## 清空 .tscn 手摆的 Obstacles/Containers/InitialSpawns/RiskZones 子节点
@@ -106,7 +106,7 @@ func _build_pois() -> void:
 	# 导致拖动只移动局部子节点（body 不动），dump 也读不到真实变化。
 	if Engine.is_editor_hint():
 		_attach_owner_to_poi_roots()
-	print("[expedition_map] built %d POIs · %d obstacles · %d containers · %d spawns" % [
+	push_warning("[expedition_map] built %d POIs · %d obstacles · %d containers · %d spawns" % [
 		POI_REGISTRY.size(), total_obstacles, total_containers, total_spawns
 	])
 
@@ -142,13 +142,13 @@ func _dump_all_pois_to_files() -> void:
 		if not result.get("ok", false):
 			push_error("[poi-dump] %s failed: %s" % [poi.POI_CLASS_NAME, result.get("error", "?")])
 			continue
-		print("[poi-dump] %s → updated %d obstacles, %d containers, %d spawns" % [
+		push_warning("[poi-dump] %s → updated %d obstacles, %d containers, %d spawns" % [
 			poi.POI_CLASS_NAME,
 			result.get("obstacles", 0),
 			result.get("containers", 0),
 			result.get("spawns", 0),
 		])
-	print("[poi-dump] done. 原文件已备份为 *.gd.bak。重新加载场景生效。")
+	push_warning("[poi-dump] done. 原文件已备份为 *.gd.bak。重新加载场景生效。")
 
 
 func activate(player: Node3D, hud: Node, world_prompt: Label3D = null) -> void:
@@ -216,12 +216,12 @@ func bake_navmesh(on_thread: bool = true) -> void:
 			nav_mesh, source_geom,
 			func() -> void:
 				nav_region.navigation_mesh = nav_mesh
-				print("[expedition_map] NavMesh bake 完成")
+				push_warning("[expedition_map] NavMesh bake 完成")
 		)
 	else:
 		NavigationServer3D.bake_from_source_geometry_data(nav_mesh, source_geom)
 		nav_region.navigation_mesh = nav_mesh
-		print("[expedition_map] NavMesh bake 完成（同步）")
+		push_warning("[expedition_map] NavMesh bake 完成（同步）")
 
 
 func get_risk_zones() -> Array:
