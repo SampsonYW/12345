@@ -204,7 +204,7 @@ static func build_obstacles(obstacles_parent: Node3D) -> int:
 static func _make_static_body(kind: int, sx: float, sy: float, sz: float) -> StaticBody3D:
 	var prototype := StaticBody3D.new()
 	prototype.name = "Obstacle"  # 给 pack() 一个非空名，否则 Godot 报 p_name.is_empty() 警告
-	prototype.collision_layer = 4  # layer 3 (Obstacles) per rules.md §3.2
+	prototype.collision_layer = 64 if sy <= 1.0 else 4  # sy<=1.0 → LowObstacle (layer 7)，否则 Obstacle (layer 3)
 	prototype.collision_mask = 0
 
 	var mesh_inst := MeshInstance3D.new()

@@ -240,7 +240,7 @@ static func dump_current_state(parents: Dictionary) -> Dictionary:
 static func _make_static_body(kind: int, sx: float, sy: float, sz: float) -> StaticBody3D:
 	var prototype := StaticBody3D.new()
 	prototype.name = "Obstacle"
-	prototype.collision_layer = 4
+	prototype.collision_layer = 64 if sy <= 1.0 else 4
 	prototype.collision_mask = 0
 
 	var mesh_inst := MeshInstance3D.new()

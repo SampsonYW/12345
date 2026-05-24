@@ -52,7 +52,8 @@ project/
 |------|----------|------|
 | `GameManager` | `scripts/managers/game_manager.gd` | 全局状态、侵蚀、计时、信号弹状态 |
 | `NoiseManager` | `scripts/managers/noise_manager.gd` | 噪音传播 & 警戒值 |
-| `PathfindManager` | `scripts/managers/pathfind_manager.gd` | A* 网格寻路（敌人绕墙追击） |
+
+寻路用 Godot 内建 `NavigationServer3D` + `NavigationRegion3D`（在 expedition_map 场景内）+ `NavigationAgent3D`（在 enemy 场景内），不通过 autoload。
 
 新增 Autoload 必须：
 1. 放在 `scripts/managers/` 下
@@ -258,10 +259,11 @@ var player := get_tree().get_first_node_in_group("player")
 |-------|------|------|
 | 1 | Player | 玩家碰撞体 |
 | 2 | Enemy | 敌人碰撞体 |
-| 3 | Obstacles | 障碍物 / 墙壁 |
+| 3 | Obstacles | 障碍物 / 墙壁（高，挡视线/子弹） |
 | 4 | Projectiles | 子弹 |
 | 5 | Containers | 容器交互 |
 | 6 | Boundary | 地图边界 |
+| 7 | LowObstacle | 矮障碍物（不挡视线/子弹，挡玩家/敌人移动，AI 寻路要绕） |
 
 新增碰撞层需在此表格和 `project.godot` 中同步更新。
 

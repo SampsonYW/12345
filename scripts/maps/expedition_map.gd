@@ -195,6 +195,35 @@ func get_bounds() -> Rect2:
 	return EXPEDITION_BOUNDS
 
 
+## 重新烘焙 NavigationRegion3D 的 navmesh。在 POI 障碍物实例化完成后调用一次。
+## 因为 POI 子节点是 NavRegion 的 sibling（不是 children），用 NavigationServer3D
+## 显式传入 ExpeditionMap 根节点扫描整张地图的几何。
+## on_thread=true 时异步烘焙，连接 bake_finished 信号通知完成；同步版本会卡帧 1-3 秒。
+func bake_navmesh(on_thread: bool = true) -> void:
+	var nav_region := get_node_or_null("NavRegion") as NavigationRegion3D
+	if nav_region == null:
+		push_warning("[expedition_map] NavRegion 节点缺失，无法烘焙 navmesh")
+		return
+	var nav_mesh: NavigationMesh = nav_region.navigation_mesh
+	if nav_mesh == null:
+		push_warning("[expedition_map] NavRegion 没有 navigation_mesh 资源")
+		return
+	# 手动 parse：从 ExpeditionMap 根节点扫描所有 sibling 子树
+	var source_geom := NavigationMeshSourceGeometryData3D.new()
+	NavigationServer3D.parse_source_geometry_data(nav_mesh, source_geom, self)
+	if on_thread:
+		NavigationServer3D.bake_from_source_geometry_data_async(
+			nav_mesh, source_geom,
+			func() -> void:
+				nav_region.navigation_mesh = nav_mesh
+				print("[expedition_map] NavMesh bake 完成")
+		)
+	else:
+		NavigationServer3D.bake_from_source_geometry_data(nav_mesh, source_geom)
+		nav_region.navigation_mesh = nav_mesh
+		print("[expedition_map] NavMesh bake 完成（同步）")
+
+
 func get_risk_zones() -> Array:
 	var zones: Array = []
 	for data in _risk_zones:
