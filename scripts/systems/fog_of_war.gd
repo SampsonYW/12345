@@ -204,8 +204,8 @@ func _update_entity_visibility() -> void:
 				continue
 			var entity: Node3D = node
 			seen_alive[entity] = true
-			var is_visible := _in_view(_player, entity.global_position)
-			_apply_visibility(entity, is_visible)
+			var in_view := _in_view(_player, entity.global_position)
+			_apply_visibility(entity, in_view)
 	# 清理：已 free 或换 group 的旧追踪记录
 	var stale: Array = []
 	for tracked in _hidden_entities.keys():
@@ -215,8 +215,8 @@ func _update_entity_visibility() -> void:
 		_hidden_entities.erase(t)
 
 
-func _apply_visibility(entity: Node3D, is_visible: bool) -> void:
-	if is_visible:
+func _apply_visibility(entity: Node3D, now_visible: bool) -> void:
+	if now_visible:
 		if _hidden_entities.has(entity):
 			entity.visible = true
 			_hidden_entities.erase(entity)

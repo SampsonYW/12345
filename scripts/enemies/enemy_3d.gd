@@ -62,16 +62,20 @@ var _nav_update_timer: float = 0.0
 var _cached_nav_direction: Vector3 = Vector3.ZERO
 var _vision_check_timer: float = 0.0
 var _cached_can_see_player: bool = false
+var _vision_ever_checked: bool = false
+var _vision_cone: MeshInstance3D = null
 
 
 func _ready() -> void:
 	add_to_group("enemies")
+	if enemy_type == EnemyType.PATROL:
+		_create_vision_cone()
 	_ensure_alert_bar()
 	_ensure_hp_bar()
 	_nav_agent = get_node_or_null("NavAgent") as NavigationAgent3D
 	_home_position = global_position
 	_state = State.PATROL if enemy_type == EnemyType.PATROL else State.SLEEP
-	_is_awake = enemy_type == EnemyType.PATROL
+	_is_awake = false
 	_erosion_tier = _get_erosion_tier()
 	_current_hp = get_scaled_hp()
 	_pick_patrol_target()
@@ -242,7 +246,7 @@ func _update_chase(player: Node3D, delta: float) -> void:
 	_nav_move_toward(player.global_position, chase_speed)
 
 
-func _update_signal_focus(delta: float) -> void:
+func _update_signal_focus(_delta: float) -> void:
 	var to_focus: Vector3 = _signal_focus_position - global_position
 	to_focus.y = 0.0
 	var dist_to_signal: float = to_focus.length()
@@ -324,9 +328,10 @@ func _pick_patrol_target() -> void:
 	)
 	var candidate := _home_position + offset
 	# 将候选点吸附到 NavMesh 上，避免落在墙内
+	# headless 模式下 NavigationServer 可能尚未同步，跳过吸附降级为原始坐标
 	if _nav_agent != null:
 		var map_rid := _nav_agent.get_navigation_map()
-		if map_rid.is_valid():
+		if map_rid.is_valid() and NavigationServer3D.map_get_iteration_id(map_rid) > 0:
 			candidate = NavigationServer3D.map_get_closest_point(map_rid, candidate)
 	_patrol_target = candidate
 	_patrol_target.y = 0.0
@@ -359,12 +364,18 @@ func can_see_player(player: Node3D) -> bool:
 	if angle > view_angle * 0.5:
 		_cached_can_see_player = false
 		return false
-	# 射线检测部分节流
+	# 射线检测部分节流；首次调用强制检测，不做节流
 	_vision_check_timer -= get_physics_process_delta_time()
-	if _vision_check_timer <= 0.0:
+	if _vision_check_timer <= 0.0 or not _vision_ever_checked:
 		_vision_check_timer = VISION_CHECK_INTERVAL
 		_cached_can_see_player = _has_clear_line_to_player(player)
+		_vision_ever_checked = true
 	return _cached_can_see_player
+
+
+## 强制下次 can_see_player 调用做完整射线检测（绕过节流）。
+func reset_vision_cache() -> void:
+	_vision_check_timer = 0.0
 
 
 func _has_clear_line_to_player(player: Node3D) -> bool:
@@ -492,6 +503,58 @@ func _update_hp_bar() -> void:
 ## 让血条和警戒条始终面向摄像机（billboard 效果）
 ## 使用 top_level 让 bar 脱离敌人旋转，直接设置全局位置跟随敌人 +
 ## 全局朝向对齐摄像机 basis，保证在斜俯视正交摄像机下始终正面可见。
+func _create_vision_cone() -> void:
+	if view_range <= 0.0:
+		return
+	var mesh := ArrayMesh.new()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	# Center vertex (apex of the fan), slightly opaque
+	st.set_color(Color(1.0, 0.35, 0.12, 0.25))
+	st.set_uv(Vector2(0.5, 0.0))
+	st.add_vertex(Vector3.ZERO)
+
+	var half_angle := deg_to_rad(view_angle * 0.5)
+	var segments := 20
+	for i in range(segments + 1):
+		var a := lerpf(-half_angle, half_angle, float(i) / float(segments))
+		var x := sin(a) * view_range
+		var z := -cos(a) * view_range
+		# Edge vertices fade to fully transparent
+		st.set_color(Color(1.0, 0.35, 0.12, 0.0))
+		st.set_uv(Vector2(float(i) / float(segments), 1.0))
+		st.add_vertex(Vector3(x, 0.0, z))
+
+	# Fan triangles: center (0) + edge_i + edge_{i+1}
+	for i in range(segments):
+		st.add_index(0)
+		st.add_index(i + 1)
+		st.add_index(i + 2)
+
+	st.generate_normals()
+	st.commit(mesh)
+
+	_vision_cone = MeshInstance3D.new()
+	_vision_cone.name = "VisionCone"
+	_vision_cone.mesh = mesh
+	_vision_cone.position = Vector3(0.0, 0.05, 0.0)  # Slightly above ground to avoid z-fighting
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.35, 0.12, 0.25)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = Color(1.0, 0.3, 0.08, 1.0)
+	mat.emission_energy_multiplier = 0.3
+	mat.vertex_color_use_as_albedo = true
+	mat.vertex_color_is_srgb = true
+	_vision_cone.material_override = mat
+	_vision_cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	add_child(_vision_cone)
+
+
 func _billboard_bars() -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:

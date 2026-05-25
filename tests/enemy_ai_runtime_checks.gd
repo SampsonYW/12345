@@ -18,6 +18,8 @@ func _run() -> void:
 	_check_dormant_noise_alert_decays_before_threshold()
 	_check_noise_threshold_forces_chase()
 	_check_take_damage_wakes_dormant_enemy()
+	_check_patrol_noise_accumulates_before_threshold()
+	_check_patrol_noise_threshold_forces_chase()
 	_check_patrol_sight_requires_range_and_angle()
 	await _check_patrol_sight_is_blocked_by_obstacles()
 	_check_alert_bar_tracks_alert_ratio()
@@ -63,6 +65,36 @@ func _check_take_damage_wakes_dormant_enemy() -> void:
 	enemy.take_damage(1.0)
 	_expect(enemy.is_awake(), "Player damage should wake a dormant enemy immediately")
 	_expect(enemy.get_ai_state_name() == "CHASE", "Damage wake should enter chase state")
+	_cleanup(enemy)
+
+
+func _check_patrol_noise_accumulates_before_threshold() -> void:
+	var enemy = _make_enemy(ENEMY_TYPE_PATROL)
+	enemy.alert_threshold = 100.0
+	enemy.decay_rate = 10.0
+
+	# Patrol enemies must start not awake so they can accumulate noise
+	_expect(not enemy.is_awake(), "Patrol enemy should start not awake (alert accumulation enabled)")
+	_expect(enemy.get_ai_state_name() == "PATROL", "Patrol enemy should still be in PATROL state")
+
+	enemy.receive_noise(40.0)
+	var raised_ratio: float = enemy.get_alert_ratio()
+	_expect(raised_ratio > 0.39 and raised_ratio < 0.41, "Patrol noise should raise alert ratio before threshold")
+	_expect(not enemy.is_awake(), "Patrol enemy should stay in patrol below alert threshold")
+
+	enemy._process(1.0)
+	_expect(enemy.get_alert_ratio() < raised_ratio, "Patrol alert ratio should decay while still patrolling")
+	_cleanup(enemy)
+
+
+func _check_patrol_noise_threshold_forces_chase() -> void:
+	var enemy = _make_enemy(ENEMY_TYPE_PATROL)
+	enemy.alert_threshold = 50.0
+
+	enemy.receive_noise(50.0)
+	_expect(enemy.is_awake(), "Patrol enemy should wake when alert reaches threshold")
+	_expect(enemy.get_ai_state_name() == "CHASE", "Patrol noise threshold should enter chase state")
+	_expect(is_equal_approx(enemy.get_alert_ratio(), 1.0), "Patrol threshold wake should fill alert ratio")
 	_cleanup(enemy)
 
 
@@ -157,6 +189,7 @@ func _check_patrol_sight_is_blocked_by_obstacles() -> void:
 
 	blocker.collision_layer = 0
 	await physics_frame
+	enemy.reset_vision_cache()
 	_expect(enemy.can_see_player(player), "Patrol sight should recover when the obstacle stops blocking vision")
 
 	_cleanup(enemy)

@@ -241,11 +241,11 @@ func get_farthest_spawn_point() -> Vector3:
 			signal_valid.sort_custom(func(a: Vector3, b: Vector3) -> bool:
 				return a.distance_to(signal_position) < b.distance_to(signal_position)
 			)
-			var candidate_count: int = mini(signal_valid.size(), 3)
-			var point := signal_valid[_spawn_point_cursor % candidate_count]
+			var scount: int = mini(signal_valid.size(), 3)
+			var spoint := signal_valid[_spawn_point_cursor % scount]
 			_spawn_point_cursor += 1
-			_last_spawn_point = point
-			return point
+			_last_spawn_point = spoint
+			return spoint
 
 	var valid := _get_ranked_spawn_points()
 	if valid.is_empty():

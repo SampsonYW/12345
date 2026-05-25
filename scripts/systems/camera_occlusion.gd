@@ -52,7 +52,7 @@ func _place_dummy(dummy: Node3D) -> void:
 		dummy.queue_free()
 
 
-func _physics_process(delta: float) -> void:
+func _physics_process(_delta: float) -> void:
 	var game: Node = get_parent()
 	if not game or not ("_player" in game) or not ("_camera" in game):
 		return

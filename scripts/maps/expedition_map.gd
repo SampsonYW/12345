@@ -35,6 +35,7 @@ const POI_REGISTRY: Array = [
 @export var rebuild_pois_on_ready: bool = true
 
 ## 编辑器按钮：把当前 POI 节点位置/旋转写回各 *_poi.gd 文件（保留注释，原文件备份为 .bak）
+@warning_ignore("unused_private_class_variable")
 @export_tool_button("Dump POI positions to .gd files") var _dump_poi_button: Callable = _dump_all_pois_to_files
 
 const EXPEDITION_BOUNDS := Rect2(Vector2(-300.0, -175.0), Vector2(600.0, 350.0))

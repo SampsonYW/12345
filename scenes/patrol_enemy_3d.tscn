@@ -60,6 +60,7 @@ base_damage = 15.0
 patrol_speed = 2.2
 chase_speed = 4.2
 view_range = 9.0
+alert_threshold = 50.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 position = Vector3(0, 0.72, 0)
