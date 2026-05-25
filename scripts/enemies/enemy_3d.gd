@@ -664,6 +664,7 @@ func _make_alert_material(
 	material.emission = emission
 	material.emission_energy_multiplier = emission_energy
 	material.roughness = 0.5
+	material.render_priority = 10  # 高于 fog_of_war 视觉遮罩，确保状态条可读
 	if albedo.a < 1.0:
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	return material
