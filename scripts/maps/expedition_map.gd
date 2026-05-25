@@ -47,6 +47,7 @@ var _world_prompt: Label3D = null
 var _container_hint_shown: bool = false
 var _pois_built: bool = false
 var _risk_zones: Array = []   # 由 POI build 时填充，运行时唯一 zone 数据源
+var runtime_spawn_points: Array[Vector3] = []  # POI 生成的动态刷怪点
 
 
 func _ready() -> void:
@@ -101,6 +102,14 @@ func _build_pois() -> void:
 		total_obstacles += poi.OBSTACLES.size()
 		total_containers += poi.CONTAINERS.size()
 		total_spawns += poi.SPAWNS.size()
+		# 收集 POI 的刷怪候选点（spawn 标记 + 容器位置）
+		# 部分 POI（core_wreck, wasteland）无 COMPACT_OFFSET，坐标已是世界坐标
+		var ox: float = poi.COMPACT_OFFSET.x if "COMPACT_OFFSET" in poi else 0.0
+		var oz: float = poi.COMPACT_OFFSET.y if "COMPACT_OFFSET" in poi else 0.0
+		for entry in poi.SPAWNS:
+			runtime_spawn_points.append(Vector3(entry[1] + ox, 0.0, entry[2] + oz))
+		for entry in poi.CONTAINERS:
+			runtime_spawn_points.append(Vector3(entry[0] + ox, 0.0, entry[1] + oz))
 	# 编辑器模式：把顶层 POI 节点（body / container / spawn marker / zone marker）的 owner 设为场景根，
 	# 让它们在 Scene 树面板里显示 + 3D 视图可选中可拖动。
 	# 注意：只设顶层节点 owner，不递归到内部 Mesh/Shape，否则用户在 viewport 会误选 Mesh 而非 body，

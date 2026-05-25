@@ -56,6 +56,7 @@ var _visible_avoidance_center: Vector3 = Vector3.ZERO
 var _visible_avoidance_radius: float = 0.0
 var _last_spawn_point: Vector3 = Vector3.ZERO
 var _spawn_cooldown: float = 0.0
+var _quadrant_cursor: int = 0
 
 
 func _ready() -> void:
@@ -88,6 +89,12 @@ func configure(enemy_parent: Node, patrol_scene: PackedScene, dormant_scene: Pac
 	_enemy_parent = enemy_parent
 	_patrol_scene = patrol_scene
 	_dormant_scene = dormant_scene
+
+
+## 用 POI 生成的动态刷怪点替换硬编码点。传入空数组则维持默认。
+func set_spawn_points(points: Array[Vector3]) -> void:
+	if not points.is_empty():
+		_spawn_points.assign(points)
 
 
 func get_spawn_points() -> Array[Vector3]:
@@ -158,6 +165,8 @@ func spawn_enemy(elapsed: float, tier: int) -> Node3D:
 	var spawn_dormant := elapsed > 60.0 and randf() < _get_dormant_ratio(tier)
 	var scene := _dormant_scene if spawn_dormant else _patrol_scene
 	var point := get_farthest_spawn_point()
+	if point == Vector3.ZERO:
+		return null
 	var enemy := _spawn_fixed(scene, point, tier)
 	if enemy != null:
 		var kind := "dormant" if spawn_dormant else "patrol"
@@ -230,31 +239,48 @@ func sample_curve(t: float) -> float:
 func get_farthest_spawn_point() -> Vector3:
 	if _signal_active:
 		set_visible_spawn_avoidance(GameManager.player_position, maxf(_visible_avoidance_radius, 28.0))
-		# 信号弹阶段：优先选择靠近信号弹位置的刷怪点
-		var signal_position := GameManager.signal_flare_position
-		var signal_valid: Array[Vector3] = []
-		for point in _spawn_points:
-			if point.distance_to(GameManager.player_position) >= minimum_spawn_distance:
-				signal_valid.append(point)
-		if not signal_valid.is_empty():
-			# 按距离信号弹位置排序（近的优先）
-			signal_valid.sort_custom(func(a: Vector3, b: Vector3) -> bool:
-				return a.distance_to(signal_position) < b.distance_to(signal_position)
+	# 象限分区：以参考点为中心把刷点分入 4 个象限，轮流从不同方向刷怪
+	var reference := GameManager.signal_flare_position if _signal_active else GameManager.player_position
+	var valid: Array[Vector3] = []
+	for point in _spawn_points:
+		if point.distance_to(GameManager.player_position) >= minimum_spawn_distance:
+			valid.append(point)
+	if valid.is_empty():
+		return Vector3.ZERO
+
+	var quadrants: Array[Array] = [[], [], [], []]
+	for point in valid:
+		var idx := _quadrant_index(point, reference)
+		quadrants[idx].append(point)
+
+	# 当前象限无候选时顺延到下一个非空象限
+	for attempt in 4:
+		var qidx := (_quadrant_cursor + attempt) % 4
+		if not quadrants[qidx].is_empty():
+			# 象限内取离参考点最远的点
+			var q := quadrants[qidx] as Array[Vector3]
+			q.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+				return a.distance_to(reference) > b.distance_to(reference)
 			)
-			var scount: int = mini(signal_valid.size(), 3)
-			var spoint := signal_valid[_spawn_point_cursor % scount]
+			var spoint := q[_spawn_point_cursor % q.size()]
 			_spawn_point_cursor += 1
+			_quadrant_cursor = (qidx + 1) % 4
 			_last_spawn_point = spoint
 			return spoint
 
-	var valid := _get_ranked_spawn_points()
-	if valid.is_empty():
-		return Vector3.ZERO
-	var candidate_count: int = mini(valid.size(), 4)
-	var point := valid[_spawn_point_cursor % candidate_count]
-	_spawn_point_cursor += 1
-	_last_spawn_point = point
-	return point
+	return Vector3.ZERO
+
+
+func _quadrant_index(point: Vector3, center: Vector3) -> int:
+	var dx := point.x - center.x
+	var dz := point.z - center.z
+	if dx >= 0.0 and dz < 0.0:
+		return 0  # NE
+	if dx < 0.0 and dz < 0.0:
+		return 1  # NW
+	if dx < 0.0 and dz >= 0.0:
+		return 2  # SW
+	return 3  # SE
 
 
 func _get_ranked_spawn_points() -> Array[Vector3]:

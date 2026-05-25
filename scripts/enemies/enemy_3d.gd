@@ -200,7 +200,11 @@ func take_damage(amount: float, from_player: bool = true) -> void:
 
 func react_to_signal_flare(origin: Vector3, extraction_position: Vector3 = Vector3.ZERO) -> void:
 	# 信号弹位置由 extraction 广播，敌人记录此位置用于向信号弹移动
-	_signal_focus_position = extraction_position if extraction_position != Vector3.ZERO else origin
+	var base := extraction_position if extraction_position != Vector3.ZERO else origin
+	# 每个敌人在信号弹周围随机散布，避免扎堆
+	var angle := randf() * TAU
+	var spread := randf_range(3.0, 8.0)
+	_signal_focus_position = base + Vector3(cos(angle) * spread, 0.0, sin(angle) * spread)
 	_signal_focus_position.y = global_position.y
 	_has_signal_focus = true
 	# 唤醒由 player_3d.gd 中 NoiseManager.emit_noise(GLOBAL) 通过 receive_noise() 完成
@@ -250,11 +254,14 @@ func _update_signal_focus(_delta: float) -> void:
 	var to_focus: Vector3 = _signal_focus_position - global_position
 	to_focus.y = 0.0
 	var dist_to_signal: float = to_focus.length()
-	if dist_to_signal <= 0.5:
-		# 到达信号弹位置后：在附近巡逻，但仍保持对玩家的感知
+	if dist_to_signal <= 1.5:
+		# 到达信号弹附近后：驻守此区域，靠视觉发现玩家后才转入追击
 		_has_signal_focus = false
-		_state = State.PATROL if enemy_type == EnemyType.PATROL else State.CHASE
+		_state = State.PATROL
 		_home_position = _signal_focus_position
+		# 休眠型天生盲视（view_range=0），驻守时赋予临时警戒视野
+		if enemy_type == EnemyType.DORMANT and view_range <= 0.0:
+			view_range = 4.0
 		_pick_patrol_target()
 		velocity = Vector3.ZERO
 		return

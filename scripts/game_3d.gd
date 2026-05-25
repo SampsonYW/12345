@@ -169,6 +169,8 @@ func _add_spawn_manager() -> void:
 		add_child(_spawn_manager)
 	if _spawn_manager.has_method("configure"):
 		_spawn_manager.configure(_enemies, PATROL_ENEMY_SCENE, DORMANT_ENEMY_SCENE)
+	if _expedition_map != null and _spawn_manager.has_method("set_spawn_points"):
+		_spawn_manager.set_spawn_points(_expedition_map.runtime_spawn_points)
 
 
 func _add_fog_of_war() -> void:
