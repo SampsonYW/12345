@@ -82,6 +82,9 @@ var _context_menu_controller: Node = null
 var _drag_drop_controller: Node = null
 var _input_interceptor: Node = null
 var _player_status_ui: Node = null
+var _world_tracking_ui: Control = null
+var _damage_vignette: ColorRect = null
+var _vignette_timer: float = 0.0
 
 @onready var top_left: VBoxContainer = %TopLeft
 @onready var top_right: VBoxContainer = %TopRight
@@ -97,6 +100,13 @@ var _player_status_ui: Node = null
 func _ready() -> void:
 	blocked_label.visible = false
 	slots_container.visible = false
+	# 受击红屏暗角
+	_damage_vignette = ColorRect.new()
+	_damage_vignette.name = "DamageVignette"
+	_damage_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_damage_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_damage_vignette.color = Color(0.8, 0.05, 0.05, 0.0)
+	add_child(_damage_vignette)
 	_bind_player_refs()
 	_bind_extraction_ref()
 
@@ -131,6 +141,10 @@ func _ready() -> void:
 	add_child(_player_status_ui)
 	_player_status_ui.apply_theme()
 
+	_world_tracking_ui = preload("res://scripts/ui/world_tracking_ui.gd").new()
+	_world_tracking_ui.name = "WorldTrackingUI"
+	add_child(_world_tracking_ui)
+
 	_menu_controller = preload("res://scripts/ui/menu_overlay_controller.gd").new(
 		self, _main_overlay, _main_prompt_label, _main_summary_label,
 		_result_overlay, _result_title_label, _result_stats_label
@@ -161,10 +175,16 @@ func _process(delta: float) -> void:
 		_blocked_hide_timer -= delta
 		if _blocked_hide_timer <= 0.0:
 			blocked_label.visible = false
+	# 受击红屏淡出
+	if _vignette_timer > 0.0 and _damage_vignette != null:
+		_vignette_timer -= delta
+		var a := clampf(_vignette_timer / 0.5, 0.0, 1.0)
+		_damage_vignette.color = Color(0.8, 0.05, 0.05, a * 0.35)
 	_process_container_search(delta)
 
 	if _player_status_ui != null:
 		_player_status_ui.update_sprint_ui()
+		_player_status_ui.update_signal_label(_extraction)
 	_update_alert_indicators(delta)
 	_update_spawn_pulses(delta)
 	queue_redraw()
@@ -205,6 +225,7 @@ func _bind_player_refs() -> void:
 		_player_health = player.get_node_or_null("PlayerHealth")
 		if _player_health != null:
 			_player_health.health_changed.connect(_on_health_changed)
+			_player_health.damaged.connect(_on_player_damaged)
 			_on_health_changed(_player_health.current_hp, _player_health.max_hp)
 	if _player_shooting == null:
 		_player_shooting = player.get_node_or_null("PlayerShooting")
@@ -844,6 +865,12 @@ func _set_run_hud_visible(is_show: bool) -> void:
 func _on_health_changed(current: float, maximum: float) -> void:
 	if _player_status_ui != null:
 		_player_status_ui.on_health_changed(current, maximum)
+
+
+func _on_player_damaged(_amount: float) -> void:
+	if _damage_vignette != null:
+		_vignette_timer = 0.5
+		_damage_vignette.color = Color(0.8, 0.05, 0.05, 0.35)
 
 
 func _on_erosion_changed(value: float) -> void:

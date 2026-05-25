@@ -5,7 +5,7 @@
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
 extends Node3D
 
-@export var wait_time: float = 75.0
+@export var wait_time: float = 35.0
 @export var boarding_range: float = 3.75
 @export var arrival_offset: Vector3 = Vector3(0.0, 0.0, -3.0)
 

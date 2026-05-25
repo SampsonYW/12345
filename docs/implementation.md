@@ -415,6 +415,7 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 10. **小地图** — `_minimap = Minimap.new()`，绘制由 Minimap 类自己处理
 11. **【已提取】键盘输入劫持** — 已拆分到 `hud_input_interceptor.gd`。
 12. **【已提取】结算屏接管** — `_update_end_flow` 已移至 `menu_overlay_controller.gd`。
+13. **【已提取】世界实体追踪 UI (2D)** — `world_tracking_ui.gd` 负责把敌人、容器头顶的状态条通过 `unproject_position` 投射到 2D 屏幕上，替代了原有的 3D Billboard。
 
 ### 10.2 内部状态字段（直接节点引用 + 数据缓存共 70+ 变量）
 

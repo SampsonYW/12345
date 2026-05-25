@@ -49,10 +49,6 @@ var _attack_timer: float = 0.0
 var _home_position: Vector3 = Vector3.ZERO
 var _patrol_target: Vector3 = Vector3.ZERO
 var _player_cache: Node3D = null
-var _alert_bar: Node3D = null
-var _alert_bar_fill: MeshInstance3D = null
-var _hp_bar: Node3D = null
-var _hp_bar_fill: MeshInstance3D = null
 var _game_manager_cache: Node = null
 var _has_signal_focus: bool = false
 var _signal_focus_position: Vector3 = Vector3.ZERO
@@ -65,13 +61,21 @@ var _cached_can_see_player: bool = false
 var _vision_ever_checked: bool = false
 var _vision_cone: MeshInstance3D = null
 
+# 受击闪白
+var _body_mesh: MeshInstance3D = null
+var _original_material: Material = null
+var _hit_flash_timer: float = 0.0
+const HIT_FLASH_DURATION := 0.1
+
 
 func _ready() -> void:
 	add_to_group("enemies")
+	
+	_body_mesh = get_node_or_null("BodyVisual") as MeshInstance3D
+	if _body_mesh != null:
+		_original_material = _body_mesh.material_override
 	if enemy_type == EnemyType.PATROL:
 		_create_vision_cone()
-	_ensure_alert_bar()
-	_ensure_hp_bar()
 	_nav_agent = get_node_or_null("NavAgent") as NavigationAgent3D
 	_home_position = global_position
 	_state = State.PATROL if enemy_type == EnemyType.PATROL else State.SLEEP
@@ -79,8 +83,6 @@ func _ready() -> void:
 	_erosion_tier = _get_erosion_tier()
 	_current_hp = get_scaled_hp()
 	_pick_patrol_target()
-	_update_alert_bar()
-	_update_hp_bar()
 	# 错开各敌人的定时器，分散同帧计算压力
 	_nav_update_timer = randf() * NAV_UPDATE_INTERVAL
 	_vision_check_timer = randf() * VISION_CHECK_INTERVAL
@@ -89,8 +91,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if not _is_awake and _current_alert > 0.0:
 		_current_alert = maxf(0.0, _current_alert - decay_rate * delta)
-		_update_alert_bar()
-	_billboard_bars()
+	# 受击闪白计时
+	if _hit_flash_timer > 0.0:
+		_hit_flash_timer -= delta
+		if _hit_flash_timer <= 0.0 and _body_mesh != null and _original_material != null:
+			_body_mesh.material_override = _original_material
 
 
 func _physics_process(delta: float) -> void:
@@ -169,7 +174,6 @@ func get_scaled_damage() -> float:
 func set_erosion_tier(tier: int) -> void:
 	_erosion_tier = clampi(tier, 0, FALLBACK_EROSION_STAT_MULTIPLIER.size() - 1)
 	_current_hp = get_scaled_hp()
-	_update_hp_bar()
 
 
 func receive_noise(value: float) -> void:
@@ -178,20 +182,25 @@ func receive_noise(value: float) -> void:
 	_current_alert = maxf(0.0, _current_alert + value)
 	if _current_alert >= alert_threshold:
 		force_awaken()
-	else:
-		_update_alert_bar()
 
 
 func force_awaken() -> void:
 	_is_awake = true
 	_current_alert = alert_threshold
 	_state = State.CHASE
-	_update_alert_bar()
 
 
 func take_damage(amount: float, from_player: bool = true) -> void:
 	_current_hp -= amount
-	_update_hp_bar()
+	# 受击闪白
+	if _body_mesh != null:
+		var flash_mat := StandardMaterial3D.new()
+		flash_mat.albedo_color = Color.WHITE
+		flash_mat.emission_enabled = true
+		flash_mat.emission = Color.WHITE
+		flash_mat.emission_energy_multiplier = 0.6
+		_body_mesh.material_override = flash_mat
+		_hit_flash_timer = HIT_FLASH_DURATION
 	if from_player:
 		force_awaken()
 	if _current_hp <= 0.0:
@@ -453,58 +462,7 @@ func _is_gameplay_active() -> bool:
 	return state == GAME_STATE_RUNNING or state == GAME_STATE_EXTRACTING
 
 
-func _ensure_alert_bar() -> void:
-	var existing := get_node_or_null("AlertBar")
-	if existing is Node3D:
-		_alert_bar = existing as Node3D
-	elif existing == null:
-		_alert_bar = Node3D.new()
-		_alert_bar.name = "AlertBar"
-		_alert_bar.position = Vector3(0.0, 1.65, 0.0)
-		add_child(_alert_bar)
-	if _alert_bar != null:
-		_alert_bar.top_level = true
-		_ensure_alert_bar_meshes()
-		if _alert_bar_fill != null and _alert_bar_fill.material_override != null:
-			_alert_bar_fill.material_override = _alert_bar_fill.material_override.duplicate()
 
-
-func _update_alert_bar() -> void:
-	if _alert_bar == null or not is_instance_valid(_alert_bar):
-		return
-	var ratio := get_alert_ratio()
-	_alert_bar.set_meta("alert_ratio", ratio)
-	if _alert_bar_fill == null or not is_instance_valid(_alert_bar_fill):
-		return
-	_alert_bar_fill.scale.x = ratio
-	_alert_bar_fill.position.x = -ALERT_BAR_WIDTH * (1.0 - ratio) * 0.5
-
-
-func _ensure_hp_bar() -> void:
-	var existing := get_node_or_null("HpBar")
-	if existing is Node3D:
-		_hp_bar = existing as Node3D
-	elif existing == null:
-		_hp_bar = Node3D.new()
-		_hp_bar.name = "HpBar"
-		_hp_bar.position = Vector3(0.0, 1.82, 0.0)
-		add_child(_hp_bar)
-	if _hp_bar != null:
-		_hp_bar.top_level = true
-		_ensure_hp_bar_meshes()
-		if _hp_bar_fill != null and _hp_bar_fill.material_override != null:
-			_hp_bar_fill.material_override = _hp_bar_fill.material_override.duplicate()
-
-
-func _update_hp_bar() -> void:
-	if _hp_bar == null or not is_instance_valid(_hp_bar):
-		return
-	var ratio := get_hp_ratio()
-	_hp_bar.set_meta("hp_ratio", ratio)
-	if _hp_bar_fill == null or not is_instance_valid(_hp_bar_fill):
-		return
-	_hp_bar_fill.scale.x = ratio
-	_hp_bar_fill.position.x = -HP_BAR_WIDTH * (1.0 - ratio) * 0.5
 
 
 ## 让血条和警戒条始终面向摄像机（billboard 效果）
@@ -562,19 +520,7 @@ func _create_vision_cone() -> void:
 	add_child(_vision_cone)
 
 
-func _billboard_bars() -> void:
-	var cam := get_viewport().get_camera_3d()
-	if cam == null:
-		return
-	var cam_basis := cam.global_transform.basis
-	for bar_info in [[_alert_bar, 1.65], [_hp_bar, 1.82]]:
-		var bar: Node3D = bar_info[0] as Node3D
-		var y_offset: float = bar_info[1]
-		if bar == null or not is_instance_valid(bar):
-			continue
-		# top_level=true 使 bar 不继承父节点变换，手动跟随敌人位置
-		bar.global_position = global_position + Vector3(0.0, y_offset, 0.0)
-		bar.global_transform.basis = cam_basis
+
 
 
 func _die() -> void:
@@ -583,88 +529,3 @@ func _die() -> void:
 	if manager != null and manager.has_method("register_kill"):
 		manager.register_kill()
 	queue_free()
-
-
-func _ensure_alert_bar_meshes() -> void:
-	var back := _alert_bar.get_node_or_null("AlertBack") as MeshInstance3D
-	if back == null:
-		back = MeshInstance3D.new()
-		back.name = "AlertBack"
-		back.mesh = _make_alert_box_mesh(
-			Vector3(ALERT_BAR_WIDTH, ALERT_BAR_HEIGHT, ALERT_BAR_DEPTH)
-		)
-		back.material_override = _make_alert_material(
-			Color(0.04, 0.05, 0.05, 0.9),
-			Color(0.0, 0.0, 0.0, 1.0),
-			0.0
-		)
-		_alert_bar.add_child(back)
-
-	_alert_bar_fill = _alert_bar.get_node_or_null("AlertFill") as MeshInstance3D
-	if _alert_bar_fill == null:
-		_alert_bar_fill = MeshInstance3D.new()
-		_alert_bar_fill.name = "AlertFill"
-		_alert_bar_fill.mesh = _make_alert_box_mesh(
-			Vector3(ALERT_BAR_WIDTH, ALERT_BAR_HEIGHT * 0.65, ALERT_BAR_DEPTH * 1.2)
-		)
-		_alert_bar_fill.material_override = _make_alert_material(
-			Color(1.0, 0.65, 0.12, 1.0),
-			Color(1.0, 0.35, 0.05, 1.0),
-			0.8
-		)
-		_alert_bar_fill.position.z = -0.01
-		_alert_bar.add_child(_alert_bar_fill)
-
-
-func _ensure_hp_bar_meshes() -> void:
-	var back := _hp_bar.get_node_or_null("HpBack") as MeshInstance3D
-	if back == null:
-		back = MeshInstance3D.new()
-		back.name = "HpBack"
-		back.mesh = _make_alert_box_mesh(
-			Vector3(HP_BAR_WIDTH, HP_BAR_HEIGHT, HP_BAR_DEPTH)
-		)
-		back.material_override = _make_alert_material(
-			Color(0.04, 0.04, 0.04, 0.9),
-			Color(0.0, 0.0, 0.0, 1.0),
-			0.0
-		)
-		_hp_bar.add_child(back)
-
-	_hp_bar_fill = _hp_bar.get_node_or_null("HpFill") as MeshInstance3D
-	if _hp_bar_fill == null:
-		_hp_bar_fill = MeshInstance3D.new()
-		_hp_bar_fill.name = "HpFill"
-		_hp_bar_fill.mesh = _make_alert_box_mesh(
-			Vector3(HP_BAR_WIDTH, HP_BAR_HEIGHT * 0.65, HP_BAR_DEPTH * 1.2)
-		)
-		_hp_bar_fill.material_override = _make_alert_material(
-			Color(0.95, 0.08, 0.05, 1.0),
-			Color(1.0, 0.04, 0.02, 1.0),
-			0.65
-		)
-		_hp_bar_fill.position.z = -0.01
-		_hp_bar.add_child(_hp_bar_fill)
-
-
-func _make_alert_box_mesh(size: Vector3) -> BoxMesh:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	return mesh
-
-
-func _make_alert_material(
-	albedo: Color,
-	emission: Color,
-	emission_energy: float
-) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = albedo
-	material.emission_enabled = emission_energy > 0.0
-	material.emission = emission
-	material.emission_energy_multiplier = emission_energy
-	material.roughness = 0.5
-	material.render_priority = 10  # 高于 fog_of_war 视觉遮罩，确保状态条可读
-	if albedo.a < 1.0:
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	return material

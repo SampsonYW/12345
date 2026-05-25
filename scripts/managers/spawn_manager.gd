@@ -258,11 +258,9 @@ func get_farthest_spawn_point() -> Vector3:
 		var qidx := (_quadrant_cursor + attempt) % 4
 		if not quadrants[qidx].is_empty():
 			# 象限内取离参考点最远的点
-			var q := quadrants[qidx] as Array[Vector3]
-			q.sort_custom(func(a: Vector3, b: Vector3) -> bool:
-				return a.distance_to(reference) > b.distance_to(reference)
-			)
-			var spoint := q[_spawn_point_cursor % q.size()]
+			var q: Array = quadrants[qidx]
+			q.sort_custom(func(a, b): return a.distance_to(reference) > b.distance_to(reference))
+			var spoint: Vector3 = q[_spawn_point_cursor % q.size()]
 			_spawn_point_cursor += 1
 			_quadrant_cursor = (qidx + 1) % 4
 			_last_spawn_point = spoint
