@@ -41,46 +41,65 @@ unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 
-[node name="HPLabel" type="Label" parent="TopLeftPanel/TopLeft"]
-unique_name_in_owner = true
+[node name="HPContainer" type="HBoxContainer" parent="TopLeftPanel/TopLeft"]
 layout_mode = 2
-text = "生命  100 / 100"
+theme_override_constants/separation = 12
 
-[node name="HPBar" type="ProgressBar" parent="TopLeftPanel/TopLeft"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 16)
+[node name="HPTitle" type="Label" parent="TopLeftPanel/TopLeft/HPContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+text = "生命"
+
+[node name="HPBar" type="ProgressBar" parent="TopLeftPanel/TopLeft/HPContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 14)
+layout_mode = 2
+size_flags_vertical = 4
 max_value = 100.0
 value = 100.0
 show_percentage = false
 
+[node name="HPLabel" type="Label" parent="TopLeftPanel/TopLeft/HPContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "100 / 100"
+
 [node name="Spacer1" type="Control" parent="TopLeftPanel/TopLeft"]
-custom_minimum_size = Vector2(0, 6)
+custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="ErosionLabel" type="Label" parent="TopLeftPanel/TopLeft"]
-unique_name_in_owner = true
+[node name="ErosionContainer" type="HBoxContainer" parent="TopLeftPanel/TopLeft"]
 layout_mode = 2
-text = "侵蚀  0%"
+theme_override_constants/separation = 12
 
-[node name="ErosionBar" type="ProgressBar" parent="TopLeftPanel/TopLeft"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(240, 16)
+[node name="ErosionTitle" type="Label" parent="TopLeftPanel/TopLeft/ErosionContainer"]
 layout_mode = 2
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+text = "侵蚀"
+
+[node name="ErosionBar" type="ProgressBar" parent="TopLeftPanel/TopLeft/ErosionContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 14)
+layout_mode = 2
+size_flags_vertical = 4
 max_value = 100.0
 value = 0.0
 show_percentage = false
+
+[node name="ErosionLabel" type="Label" parent="TopLeftPanel/TopLeft/ErosionContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "0%"
 
 [node name="Spacer2" type="Control" parent="TopLeftPanel/TopLeft"]
 custom_minimum_size = Vector2(0, 6)
 layout_mode = 2
 mouse_filter = 2
-
-[node name="WeightLabel" type="Label" parent="TopLeftPanel/TopLeft"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "负重  0 / 50"
 
 [node name="ZoneSpacer" type="Control" parent="TopLeftPanel/TopLeft"]
 custom_minimum_size = Vector2(0, 10)
@@ -121,51 +140,20 @@ unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 
-[node name="StateLabel" type="Label" parent="TopRightPanel/TopRight"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "状态  准备中"
-horizontal_alignment = 2
-theme_override_font_sizes/font_size = 24
-
-[node name="TimeLabel" type="Label" parent="TopRightPanel/TopRight"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "时间  00:00"
-horizontal_alignment = 2
-theme_override_font_sizes/font_size = 24
-
 [node name="SignalLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "信号  就绪"
+text = "信号 就绪"
 horizontal_alignment = 2
-theme_override_font_sizes/font_size = 24
-
-[node name="RiskLabel" type="Label" parent="TopRightPanel/TopRight"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "风险  标题"
-horizontal_alignment = 2
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 18
 
 [node name="AmmoLabel" type="Label" parent="TopRightPanel/TopRight"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "弹药  60 / 60"
+text = "弹药 60/60"
 horizontal_alignment = 2
+theme_override_font_sizes/font_size = 18
 
-[node name="ScoreLabel" type="Label" parent="TopRightPanel/TopRight"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "分数  0"
-horizontal_alignment = 2
-
-[node name="CollectibleLabel" type="Label" parent="TopRightPanel/TopRight"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "收集品  0"
-horizontal_alignment = 2
 
 [node name="BottomBar" type="HBoxContainer" parent="."]
 unique_name_in_owner = true

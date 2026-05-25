@@ -9,12 +9,7 @@ const ACCENT_COLOR := Color(0.4, 0.7, 0.9, 1.0)
 const SPRINT_COLOR_READY := Color(0.4, 0.7, 0.9, 1.0)
 const SPRINT_COLOR_ACTIVE := Color(0.9, 0.9, 0.95, 1.0)
 const SPRINT_COLOR_COOLDOWN := Color(0.4, 0.5, 0.6, 1.0)
-const START_KEYS := [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
-const ITEM_RELIC := preload("res://resources/items/relic_small.tres")
-const ITEM_AMMO := preload("res://resources/items/standard_ammo.tres")
-const ITEM_BATTERY := preload("res://resources/items/battery_small.tres")
-const ITEM_PURIFIER := preload("res://resources/items/purifier.tres")
 const STORAGE_DRAG_SLOT_SCRIPT := preload("res://scripts/ui/storage_drag_slot.gd")
 
 # ----- Alert indicator constants (polish_plan §3) -----
@@ -47,17 +42,19 @@ var _player: Node = null
 var _blocked_hide_timer: float = 0.0
 var _slot_panels: Array[Panel] = []
 
-@onready var _state_label: Label = %StateLabel
-@onready var _time_label: Label = %TimeLabel
+@warning_ignore("unused_private_class_variable")
 @onready var _signal_label: Label = %SignalLabel
-@onready var _risk_label: Label = %RiskLabel
+@warning_ignore("unused_private_class_variable")
 @onready var _zone_name_label: Label = %ZoneNameLabel
+@warning_ignore("unused_private_class_variable")
 @onready var _zone_risk_label: Label = %ZoneRiskLabel
 @onready var _zone_container: VBoxContainer = %ZoneInfo
 @onready var _minimap: Control = %Minimap
 @onready var _sprint_container: Control = %SprintUI
 @onready var _sprint_bar: ProgressBar = %SprintBar
+@warning_ignore("unused_private_class_variable")
 @onready var _sprint_label: Label = %SprintLabel
+@warning_ignore("unused_private_class_variable")
 @onready var _sprint_status_label: Label = %SprintStatus
 @onready var _prompt_label: Label = %PromptLabel
 @onready var _hold_progress_container: Control = %HoldProgress
@@ -69,6 +66,7 @@ var _slot_panels: Array[Panel] = []
 @onready var _result_overlay: Control = %ResultOverlay
 @onready var _result_title_label: Label = %ResultTitleLabel
 @onready var _result_stats_label: Label = %ResultStatsLabel
+var _menu_controller: RefCounted = null
 var _backpack_overlay: Control = null
 var _storage_overlay: Control = null
 var _search_overlay: Control = null
@@ -80,23 +78,10 @@ var _search_entry_snapshot: Array = []
 var _spawn_manager: Node = null
 var _alert_indicators: Array[Dictionary] = []  # [{screen_pos, opacity, direction}]
 var _spawn_pulses: Array[Dictionary] = []  # [{screen_pos, remaining, max_time, direction}]
-var _context_menu: PopupMenu = null
-var _context_slot_index: int = -1
-var _context_warehouse_name: String = ""
-var _context_container_index: int = -1
-var _warehouse_stock := {
-	"标准弹药": 12,
-	"能量电池": 6,
-	"净化剂": 2,
-	"残响碎片": 1,
-}
-var _warehouse_order := ["标准弹药", "能量电池", "净化剂", "残响碎片"]
-var _warehouse_items := {
-	"标准弹药": ITEM_AMMO,
-	"能量电池": ITEM_BATTERY,
-	"净化剂": ITEM_PURIFIER,
-	"残响碎片": ITEM_RELIC,
-}
+var _context_menu_controller: Node = null
+var _drag_drop_controller: Node = null
+var _input_interceptor: Node = null
+var _player_status_ui: Node = null
 
 @onready var top_left: VBoxContainer = %TopLeft
 @onready var top_right: VBoxContainer = %TopRight
@@ -104,10 +89,7 @@ var _warehouse_items := {
 @onready var hp_label: Label = %HPLabel
 @onready var erosion_bar: ProgressBar = %ErosionBar
 @onready var erosion_label: Label = %ErosionLabel
-@onready var weight_label: Label = %WeightLabel
 @onready var ammo_label: Label = %AmmoLabel
-@onready var score_label: Label = %ScoreLabel
-@onready var collectible_label: Label = %CollectibleLabel
 @onready var blocked_label: Label = %BlockedLabel
 @onready var slots_container: HBoxContainer = %BottomBar
 
@@ -122,16 +104,44 @@ func _ready() -> void:
 	GameManager.state_changed.connect(_on_state_changed)
 	GameManager.signal_flare_fired.connect(_on_signal_flare_fired)
 	GameManager.location_changed.connect(_on_location_changed)
+	
+	_context_menu_controller = preload("res://scripts/ui/context_menu_controller.gd").new()
+	_context_menu_controller.setup(self)
+	_context_menu_controller.item_use_requested.connect(_on_context_menu_use_requested)
+	_context_menu_controller.item_discard_requested.connect(_on_context_menu_discard_requested)
+	_context_menu_controller.transfer_to_warehouse_requested.connect(_on_context_menu_to_warehouse)
+	_context_menu_controller.transfer_to_backpack_from_warehouse_requested.connect(_on_context_menu_to_backpack_from_warehouse)
+	_context_menu_controller.transfer_to_backpack_from_container_requested.connect(_on_context_menu_to_backpack_from_container)
+	_context_menu_controller.transfer_to_container_requested.connect(_on_context_menu_to_container)
+	add_child(_context_menu_controller)
+	
+	_drag_drop_controller = preload("res://scripts/ui/drag_drop_controller.gd").new()
+	_drag_drop_controller.transfer_warehouse_to_backpack_requested.connect(_on_drag_warehouse_to_backpack)
+	_drag_drop_controller.transfer_container_to_backpack_requested.connect(_on_drag_container_to_backpack)
+	_drag_drop_controller.transfer_backpack_to_warehouse_requested.connect(_on_drag_backpack_to_warehouse)
+	_drag_drop_controller.transfer_backpack_to_container_requested.connect(_on_drag_backpack_to_container)
+	add_child(_drag_drop_controller)
+	
+	_input_interceptor = preload("res://scripts/ui/hud_input_interceptor.gd").new()
+	_input_interceptor.setup(self)
+	add_child(_input_interceptor)
+	
+	_player_status_ui = preload("res://scripts/ui/player_status_ui.gd").new()
+	_player_status_ui.setup(self)
+	add_child(_player_status_ui)
+	_player_status_ui.apply_theme()
 
+	_menu_controller = preload("res://scripts/ui/menu_overlay_controller.gd").new(
+		self, _main_overlay, _main_prompt_label, _main_summary_label,
+		_result_overlay, _result_title_label, _result_stats_label
+	)
+	
 	_on_erosion_changed(GameManager.player_erosion)
 	_on_state_changed(GameManager.current_state)
-	_update_time_label()
-	_update_signal_label()
-	_apply_soft_ui_theme()
+
+	if _player_status_ui != null:
+		_player_status_ui.update_signal_label(_extraction)
 	_style_sprint_bar()
-	_main_overlay.gui_input.connect(_on_main_overlay_gui_input)
-	%MainOverlay/Content/StartButton.pressed.connect(_on_title_clicked)
-	%ResultOverlay/Content/ReturnButton.pressed.connect(_return_to_home_from_result)
 	call_deferred("_restore_launch_screen")
 
 	# Collect slot panels from BottomBar children
@@ -152,90 +162,22 @@ func _process(delta: float) -> void:
 		if _blocked_hide_timer <= 0.0:
 			blocked_label.visible = false
 	_process_container_search(delta)
-	_update_time_label()
-	_update_signal_label()
-	_update_sprint_ui()
+
+	if _player_status_ui != null:
+		_player_status_ui.update_sprint_ui()
 	_update_alert_indicators(delta)
 	_update_spawn_pulses(delta)
 	queue_redraw()
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey):
-		return
-	if not event.pressed or event.echo:
-		return
-	if _main_overlay != null and _main_overlay.visible:
-		if event.physical_keycode in START_KEYS:
-			_mark_input_as_handled()
-			_on_title_clicked()
-		return
-	if _result_overlay != null and _result_overlay.visible:
-		if event.physical_keycode in START_KEYS:
-			_mark_input_as_handled()
-			_return_to_home_from_result()
-		return
-	if GameManager.current_location == GameManager.Location.TITLE:
-		return
-	if event.is_action_pressed("backpack"):
-		_mark_input_as_handled()
-		if _active_blocking_overlay != null:
-			close_blocking_overlay()
-		else:
-			open_backpack()
-		return
-	if event.keycode == KEY_ESCAPE and _active_blocking_overlay != null:
-		_mark_input_as_handled()
-		close_blocking_overlay()
-		return
-	if _active_blocking_overlay != null and _inventory != null:
-		for i in 8:
-			if event.is_action_pressed("use_slot_%d" % (i + 1)):
-				_mark_input_as_handled()
-				_inventory.use_slot(i)
-				var grid := _get_visible_backpack_grid()
-				if grid != null:
-					_populate_backpack_grid(grid)
-				return
-
-
 func _restore_launch_screen() -> void:
 	GameManager.reset_run()
 	GameManager.set_location(GameManager.Location.TITLE)
-	_show_main_overlay(true)
+	if _menu_controller != null:
+		_menu_controller.show_main_overlay(true)
 	if GameManager.consume_start_after_reload():
-		_start_run_from_ui()
-
-
-func _mark_input_as_handled() -> void:
-	var viewport := get_viewport()
-	if viewport != null:
-		viewport.set_input_as_handled()
-
-
-func _apply_soft_ui_theme() -> void:
-
-	# Style ProgressBars
-	_style_progress_bar(hp_bar, Color(0.4, 0.8, 0.5, 1.0))
-	_style_progress_bar(erosion_bar, Color(0.7, 0.5, 0.8, 1.0))
-
-	# Clean up Labels with subtle shadow
-	for child in top_left.get_children() + top_right.get_children():
-		if child is Label:
-			child.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.3))
-			child.add_theme_constant_override("shadow_offset_x", 1)
-			child.add_theme_constant_override("shadow_offset_y", 1)
-
-
-func _style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.1, 0.1, 0.12, 0.5)
-	bg.set_corner_radius_all(6)
-	bar.add_theme_stylebox_override("background", bg)
-	var fg := StyleBoxFlat.new()
-	fg.bg_color = fill_color
-	fg.set_corner_radius_all(6)
-	bar.add_theme_stylebox_override("fill", fg)
+		if _menu_controller != null:
+			_menu_controller.start_run_from_ui()
 
 
 func _style_sprint_bar() -> void:
@@ -315,45 +257,32 @@ func hide_hold_progress() -> void:
 		_hold_progress_container.visible = false
 
 
-func set_risk_label_text(text: String) -> void:
-	if _risk_label != null:
-		_risk_label.text = text
 
-
-func get_risk_label_text() -> String:
-	return _risk_label.text if _risk_label != null else ""
 
 
 func set_zone_info(zone_name: String, risk: String) -> void:
-	if _zone_container != null:
-		_zone_container.visible = zone_name != ""
-	if _zone_name_label != null:
-		_zone_name_label.text = zone_name
-	if _zone_risk_label != null:
-		var risk_display := "低风险" if risk == "low" else "高风险"
-		_zone_risk_label.text = "危险等级: %s" % risk_display
-		if risk == "high":
-			_zone_risk_label.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3, 1.0))
-		else:
-			_zone_risk_label.add_theme_color_override("font_color", Color(0.45, 0.9, 0.55, 1.0))
+	if _player_status_ui != null:
+		_player_status_ui.set_zone_info(zone_name, risk)
 
 
 func open_backpack() -> void:
 	close_blocking_overlay()
 	if _backpack_overlay == null or not is_instance_valid(_backpack_overlay):
-		_backpack_overlay = _build_backpack_overlay()
+		_backpack_overlay = preload("res://scripts/ui/inventory_overlay.gd").new()
+		_backpack_overlay.setup(self)
 		add_child(_backpack_overlay)
-	_populate_backpack_grid(_backpack_overlay.find_child("BackpackGrid", true, false) as GridContainer)
+	_backpack_overlay.refresh_backpack()
 	_show_blocking_overlay(_backpack_overlay)
 
 
 func open_storage() -> void:
 	close_blocking_overlay()
 	if _storage_overlay == null or not is_instance_valid(_storage_overlay):
-		_storage_overlay = _build_storage_overlay()
+		_storage_overlay = preload("res://scripts/ui/warehouse_overlay.gd").new()
+		_storage_overlay.setup(self)
 		add_child(_storage_overlay)
-	_populate_backpack_grid(_storage_overlay.find_child("BackpackGrid", true, false) as GridContainer)
-	_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
+	_storage_overlay.refresh_backpack()
+	_storage_overlay.refresh_warehouse()
 	_show_blocking_overlay(_storage_overlay)
 
 
@@ -366,10 +295,11 @@ func open_container_search(container: Node) -> void:
 	if container.has_method("open_container"):
 		container.open_container()
 	if _search_overlay == null or not is_instance_valid(_search_overlay):
-		_search_overlay = _build_search_overlay()
+		_search_overlay = preload("res://scripts/ui/container_search_overlay.gd").new()
+		_search_overlay.setup(self)
 		add_child(_search_overlay)
-	_populate_backpack_grid(_search_overlay.find_child("BackpackGrid", true, false) as GridContainer)
-	_populate_container_list()
+	_search_overlay.refresh_backpack()
+	_search_overlay.refresh_container()
 	_show_blocking_overlay(_search_overlay)
 
 
@@ -403,132 +333,12 @@ func _show_blocking_overlay(overlay: Control) -> void:
 
 func _get_visible_backpack_grid() -> GridContainer:
 	if _backpack_overlay != null and _backpack_overlay.visible:
-		return _backpack_overlay.find_child("BackpackGrid", true, false) as GridContainer
+		return _backpack_overlay.get_grid()
 	if _storage_overlay != null and _storage_overlay.visible:
-		return _storage_overlay.find_child("BackpackGrid", true, false) as GridContainer
+		return _storage_overlay.get_grid()
 	if _search_overlay != null and _search_overlay.visible:
-		return _search_overlay.find_child("BackpackGrid", true, false) as GridContainer
+		return _search_overlay.get_grid()
 	return null
-
-
-func _build_backpack_overlay() -> Control:
-	var overlay := _make_overlay("BackpackOverlay", Vector2(700.0, 600.0))
-	var panel := overlay.get_node("Panel") as PanelContainer
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 12)
-	panel.add_child(content)
-	content.add_child(_make_overlay_title("背包"))
-	var grid := _make_backpack_grid()
-	content.add_child(grid)
-	content.add_child(_make_hint_label("按 Esc 或 B 关闭。数字键 1-8 或右键可使用物品。"))
-	return overlay
-
-
-func _build_storage_overlay() -> Control:
-	var overlay := _make_overlay("StorageOverlay", Vector2(1100.0, 700.0))
-	var panel := overlay.get_node("Panel") as PanelContainer
-	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 160)
-	panel.add_child(columns)
-
-	var left := VBoxContainer.new()
-	left.set_script(STORAGE_DRAG_SLOT_SCRIPT)
-	left.set("owner_hud", self)
-	left.set("accept_target", "backpack_slot")
-	left.custom_minimum_size = Vector2(390.0, 0.0)
-	left.add_theme_constant_override("separation", 12)
-	columns.add_child(left)
-	left.add_child(_make_overlay_title("背包"))
-	left.add_child(_make_backpack_grid())
-
-	var right := VBoxContainer.new()
-	right.set_script(STORAGE_DRAG_SLOT_SCRIPT)
-	right.set("owner_hud", self)
-	right.set("accept_target", "warehouse_list")
-	right.custom_minimum_size = Vector2(360.0, 0.0)
-	right.add_theme_constant_override("separation", 10)
-	columns.add_child(right)
-	right.add_child(_make_overlay_title("仓库"))
-	var list := VBoxContainer.new()
-	list.name = "WarehouseList"
-	list.add_theme_constant_override("separation", 6)
-	right.add_child(list)
-	right.add_child(_make_hint_label(
-		"右键物品可快速转移。拖拽或点击转移按钮也可操作。"
-	))
-	return overlay
-
-
-func _build_search_overlay() -> Control:
-	var overlay := _make_overlay("SearchOverlay", Vector2(1160.0, 740.0))
-	var panel := overlay.get_node("Panel") as PanelContainer
-	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 160)
-	panel.add_child(columns)
-
-	var left := VBoxContainer.new()
-	left.set_script(STORAGE_DRAG_SLOT_SCRIPT)
-	left.set("owner_hud", self)
-	left.set("accept_target", "backpack_slot")
-	left.custom_minimum_size = Vector2(390.0, 0.0)
-	left.add_theme_constant_override("separation", 12)
-	columns.add_child(left)
-	left.add_child(_make_overlay_title("背包"))
-	left.add_child(_make_backpack_grid())
-
-	var right := VBoxContainer.new()
-	right.set_script(STORAGE_DRAG_SLOT_SCRIPT)
-	right.set("owner_hud", self)
-	right.set("accept_target", "container_list")
-	right.custom_minimum_size = Vector2(430.0, 0.0)
-	right.add_theme_constant_override("separation", 10)
-	columns.add_child(right)
-	right.add_child(_make_overlay_title("容器"))
-	var list := GridContainer.new()
-	list.name = "ContainerList"
-	list.columns = 3
-	list.add_theme_constant_override("h_separation", 8)
-	list.add_theme_constant_override("v_separation", 8)
-	right.add_child(list)
-	_search_feedback_label = _make_hint_label("")
-	_search_feedback_label.name = "SearchFeedback"
-	right.add_child(_search_feedback_label)
-	right.add_child(_make_hint_label(
-		"右键已发现物品可快速转移到背包；右键背包格子可存入容器。"
-	))
-	return overlay
-
-
-func _make_overlay(node_name: String, overlay_size: Vector2) -> Control:
-	var overlay := ColorRect.new()
-	overlay.name = node_name
-	overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	overlay.color = Color(0.02, 0.025, 0.025, 0.58)
-	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	overlay.visible = false
-
-	var panel := PanelContainer.new()
-	panel.name = "Panel"
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -overlay_size.x * 0.5
-	panel.offset_top = -overlay_size.y * 0.5
-	panel.offset_right = overlay_size.x * 0.5
-	panel.offset_bottom = overlay_size.y * 0.5
-	panel.add_theme_stylebox_override("panel", _make_panel_style(Color(0.055, 0.065, 0.06, 0.88)))
-	overlay.add_child(panel)
-	return overlay
-
-
-func _position_overlay_child(
-	control: Control,
-	top_left_offset: Vector2,
-	bottom_right_offset: Vector2
-) -> void:
-	control.set_anchors_preset(Control.PRESET_CENTER)
-	control.offset_left = top_left_offset.x
-	control.offset_top = top_left_offset.y
-	control.offset_right = bottom_right_offset.x
-	control.offset_bottom = bottom_right_offset.y
 
 
 func _make_overlay_title(text: String) -> Label:
@@ -560,47 +370,26 @@ func _make_backpack_grid() -> GridContainer:
 	return grid
 
 
-func _populate_backpack_grid(grid: GridContainer) -> void:
-	if grid == null:
-		return
-	_clear_ui_children(grid)
-	var slots: Array = _inventory.slots if _inventory != null else []
-	for i in 8:
-		var slot := PanelContainer.new()
-		slot.set_script(STORAGE_DRAG_SLOT_SCRIPT)
-		slot.set("owner_hud", self)
-		slot.set("accept_target", "backpack_slot")
-		slot.custom_minimum_size = Vector2(120.0, 106.0)
-		slot.add_theme_stylebox_override("panel", _make_panel_style(Color(0.08, 0.09, 0.085, 0.82)))
-
-		var box := VBoxContainer.new()
-		box.add_theme_constant_override("separation", 4)
-		slot.add_child(box)
-
-		var title := Label.new()
-		title.name = "ItemName"
-		title.clip_text = true
-		title.add_theme_font_size_override("font_size", 18)
-		title.add_theme_color_override("font_color", Color(0.92, 0.96, 0.90, 1.0))
-		var item: ItemDataResource = slots[i] if i < slots.size() else null
-		title.text = item.item_name if item != null else ""
-		if item != null:
-			slot.set("drag_payload", {
-				"source": "backpack",
-				"slot_index": i,
-				"label": item.item_name,
-			})
-		box.add_child(title)
-
-		var detail := Label.new()
-		detail.text = "栏位 %d" % (i + 1)
-		detail.add_theme_font_size_override("font_size", 15)
-		detail.add_theme_color_override("font_color", Color(0.62, 0.70, 0.66, 1.0))
-		box.add_child(detail)
-
-		# Right-click context menu support
-		slot.gui_input.connect(_on_backpack_slot_gui_input.bind(i))
-		grid.add_child(slot)
+func _make_backpack_stats() -> HBoxContainer:
+	var stats := HBoxContainer.new()
+	stats.name = "BackpackStats"
+	stats.add_theme_constant_override("separation", 24)
+	var weight_lbl := Label.new()
+	weight_lbl.name = "Weight"
+	weight_lbl.add_theme_font_size_override("font_size", 18)
+	weight_lbl.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9, 1.0))
+	stats.add_child(weight_lbl)
+	var score_lbl := Label.new()
+	score_lbl.name = "Score"
+	score_lbl.add_theme_font_size_override("font_size", 18)
+	score_lbl.add_theme_color_override("font_color", Color(0.95, 0.85, 0.4, 1.0))
+	stats.add_child(score_lbl)
+	var coll_lbl := Label.new()
+	coll_lbl.name = "Collectibles"
+	coll_lbl.add_theme_font_size_override("font_size", 18)
+	coll_lbl.add_theme_color_override("font_color", Color(0.8, 0.95, 0.6, 1.0))
+	stats.add_child(coll_lbl)
+	return stats
 
 
 func _on_backpack_slot_gui_input(event: InputEvent, slot_index: int) -> void:
@@ -616,8 +405,8 @@ func _on_backpack_slot_gui_input(event: InputEvent, slot_index: int) -> void:
 		item = _inventory.get_slot_item(slot_index)
 	if item == null:
 		return
-	_context_slot_index = slot_index
-	_show_context_menu_at(event.global_position, item, loc)
+	var is_search_active := _search_overlay != null and _search_overlay.visible and _search_container != null
+	_context_menu_controller.show_for_backpack(event.global_position, item, slot_index, loc, is_search_active)
 
 
 func _on_warehouse_row_gui_input(event: InputEvent, item_name: String) -> void:
@@ -625,15 +414,9 @@ func _on_warehouse_row_gui_input(event: InputEvent, item_name: String) -> void:
 		return
 	if not event.pressed or event.button_index != MOUSE_BUTTON_RIGHT:
 		return
-	if int(_warehouse_stock.get(item_name, 0)) <= 0:
+	if WarehouseManager.get_stock(item_name) <= 0:
 		return
-	_context_warehouse_name = item_name
-	var menu := _prepare_context_menu()
-	menu.add_item("%s  x%d" % [item_name, int(_warehouse_stock.get(item_name, 0))], 0)
-	menu.set_item_disabled(0, true)
-	menu.add_separator()
-	menu.add_item("转移到背包", 4)
-	_finalize_context_menu(event.global_position)
+	_context_menu_controller.show_for_warehouse(event.global_position, item_name, WarehouseManager.get_stock(item_name))
 
 
 func _on_container_row_gui_input(event: InputEvent, entry_index: int) -> void:
@@ -643,113 +426,69 @@ func _on_container_row_gui_input(event: InputEvent, entry_index: int) -> void:
 		return
 	if not _can_transfer_container_entry(entry_index):
 		return
-	_context_container_index = entry_index
 	var label_text := _get_container_entry_label(entry_index)
-	var menu := _prepare_context_menu()
-	menu.add_item(label_text, 0)
-	menu.set_item_disabled(0, true)
-	menu.add_separator()
-	menu.add_item("转移到背包", 5)
-	_finalize_context_menu(event.global_position)
+	_context_menu_controller.show_for_container(event.global_position, entry_index, label_text)
 
 
-func _show_context_menu_at(at_position: Vector2, item: ItemDataResource, loc: int) -> void:
-	var menu := _prepare_context_menu()
-	# Item header (disabled, just for display)
-	var type_name := _get_item_type_name(item.type)
-	menu.add_item("%s  [%s]" % [item.item_name, type_name], 0)
-	menu.set_item_disabled(0, true)
-	menu.add_separator()
+func _on_context_menu_use_requested(slot_index: int) -> void:
+	if _inventory != null and _inventory.has_method("use_slot"):
+		_inventory.use_slot(slot_index)
+	_refresh_after_context_menu()
 
-	if loc == GameManager.Location.EXPEDITION:
-		# Use action
-		var can_use := item.type != ItemDataResource.Type.COLLECTIBLE
-		menu.add_item("使用", 1)
-		if not can_use:
-			var use_idx := menu.get_item_index(1)
-			menu.set_item_disabled(use_idx, true)
-			menu.set_item_tooltip(use_idx, "残响碎片仅在撤离后结算分数")
-		# Discard action
-		menu.add_item("丢弃", 2)
-		# Store to open container (only if container search overlay is currently open)
-		if _search_overlay != null and _search_overlay.visible and _search_container != null:
-			menu.add_item("存入容器", 6)
-	elif loc == GameManager.Location.AFTERGLOW:
-		# Transfer to warehouse
-		menu.add_item("转移到仓库", 3)
+func _on_context_menu_discard_requested(slot_index: int) -> void:
+	if _inventory != null and _inventory.has_method("remove_slot_item"):
+		var removed: ItemDataResource = _inventory.remove_slot_item(slot_index)
+		if removed != null:
+			_on_pickup_blocked("已丢弃: %s" % removed.item_name)
+	_refresh_after_context_menu()
 
-	_finalize_context_menu(at_position)
+func _on_context_menu_to_warehouse(slot_index: int) -> void:
+	transfer_backpack_slot_to_storage(slot_index)
+	_refresh_after_context_menu()
 
+func _on_context_menu_to_backpack_from_warehouse(item_name: String) -> void:
+	_transfer_warehouse_item(item_name)
+	_refresh_after_context_menu()
 
-func _prepare_context_menu() -> PopupMenu:
-	if _context_menu != null and is_instance_valid(_context_menu):
-		_context_menu.queue_free()
-	_context_menu = PopupMenu.new()
-	_context_menu.name = "SlotContextMenu"
-	return _context_menu
+func _on_context_menu_to_backpack_from_container(entry_index: int) -> void:
+	_transfer_container_entry(entry_index)
+	_refresh_after_context_menu()
 
+func _on_context_menu_to_container(slot_index: int) -> void:
+	transfer_backpack_slot_to_container(slot_index)
+	_refresh_after_context_menu()
 
-func _finalize_context_menu(at_position: Vector2) -> void:
-	_context_menu.id_pressed.connect(_on_context_menu_id_pressed)
-	add_child(_context_menu)
-	_context_menu.position = Vector2i(int(at_position.x), int(at_position.y))
-	_context_menu.popup()
+func _on_drag_warehouse_to_backpack(item_name: String) -> void:
+	transfer_storage_item_to_backpack(item_name)
 
+func _on_drag_container_to_backpack(entry_index: int) -> void:
+	_transfer_container_entry(entry_index)
+	_refresh_after_context_menu()
 
-func _on_context_menu_id_pressed(id: int) -> void:
-	match id:
-		1:  # 使用 (expedition backpack)
-			if _inventory != null and _inventory.has_method("use_slot") and _context_slot_index >= 0:
-				_inventory.use_slot(_context_slot_index)
-		2:  # 丢弃 (expedition backpack)
-			if _inventory != null and _inventory.has_method("remove_slot_item") and _context_slot_index >= 0:
-				var removed: ItemDataResource = _inventory.remove_slot_item(_context_slot_index)
-				if removed != null:
-					_on_pickup_blocked("已丢弃: %s" % removed.item_name)
-		3:  # 转移到仓库 (afterglow backpack → warehouse)
-			if _context_slot_index >= 0:
-				transfer_backpack_slot_to_storage(_context_slot_index)
-		4:  # 转移到背包 (afterglow warehouse → backpack)
-			if _context_warehouse_name != "":
-				_transfer_warehouse_item(_context_warehouse_name)
-		5:  # 转移到背包 (expedition container → backpack)
-			if _context_container_index >= 0:
-				_transfer_container_entry(_context_container_index)
-		6:  # 存入容器 (expedition backpack → container)
-			if _context_slot_index >= 0:
-				transfer_backpack_slot_to_container(_context_slot_index)
-	_context_slot_index = -1
-	_context_warehouse_name = ""
-	_context_container_index = -1
-	# Refresh whichever grids/lists are currently visible
-	var grid := _get_visible_backpack_grid()
-	if grid != null:
-		_populate_backpack_grid(grid)
+func _on_drag_backpack_to_warehouse(slot_index: int) -> void:
+	transfer_backpack_slot_to_storage(slot_index)
+	_refresh_after_context_menu()
+
+func _on_drag_backpack_to_container(slot_index: int) -> void:
+	transfer_backpack_slot_to_container(slot_index)
+	_refresh_after_context_menu()
+
+func _refresh_after_context_menu() -> void:
+	if _backpack_overlay != null and _backpack_overlay.visible:
+		_backpack_overlay.refresh_backpack()
 	if _storage_overlay != null and _storage_overlay.visible:
-		_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
+		_storage_overlay.refresh_backpack()
+		_storage_overlay.refresh_warehouse()
 	if _search_overlay != null and _search_overlay.visible:
-		_populate_container_list()
-
-
-func _get_item_type_name(type: int) -> String:
-	match type:
-		ItemDataResource.Type.COLLECTIBLE:
-			return "收藏品"
-		ItemDataResource.Type.AMMO:
-			return "弹药"
-		ItemDataResource.Type.BATTERY:
-			return "电池"
-		ItemDataResource.Type.PURIFIER:
-			return "净化剂"
-		_:
-			return "未知"
+		_search_overlay.refresh_backpack()
+		_search_overlay.refresh_container()
 
 
 func _populate_warehouse_list(list: VBoxContainer) -> void:
 	if list == null:
 		return
 	_clear_ui_children(list)
-	for item_name in _warehouse_order:
+	for item_name in WarehouseManager.order:
 		var row_panel := PanelContainer.new()
 		row_panel.set_script(STORAGE_DRAG_SLOT_SCRIPT)
 		row_panel.set("owner_hud", self)
@@ -766,7 +505,7 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 		row.mouse_filter = Control.MOUSE_FILTER_PASS
 		row_panel.add_child(row)
 		var label := Label.new()
-		label.text = "%s x %d" % [String(item_name), int(_warehouse_stock.get(item_name, 0))]
+		label.text = "%s x %d" % [String(item_name), WarehouseManager.get_stock(String(item_name))]
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		label.add_theme_font_size_override("font_size", 18)
 		label.add_theme_color_override("font_color", Color(0.90, 0.94, 0.88, 1.0))
@@ -774,7 +513,7 @@ func _populate_warehouse_list(list: VBoxContainer) -> void:
 		row.add_child(label)
 		var button := Button.new()
 		button.text = "转移"
-		button.disabled = int(_warehouse_stock.get(item_name, 0)) <= 0
+		button.disabled = WarehouseManager.get_stock(String(item_name)) <= 0
 		button.custom_minimum_size = Vector2(72.0, 30.0)
 		button.pressed.connect(Callable(self, "_transfer_warehouse_item").bind(String(item_name)))
 		row.add_child(button)
@@ -874,8 +613,9 @@ func _transfer_container_entry(index: int) -> bool:
 		_set_search_feedback("已移至背包。")
 	else:
 		_set_search_feedback("无法转移物品。")
-	_populate_backpack_grid(_search_overlay.find_child("BackpackGrid", true, false) as GridContainer)
-	_populate_container_list()
+	if _search_overlay != null and _search_overlay.visible:
+		_search_overlay.refresh_backpack()
+		_search_overlay.refresh_container()
 	return moved
 
 
@@ -894,11 +634,10 @@ func transfer_backpack_slot_to_storage(slot_index: int) -> bool:
 	var removed: ItemDataResource = _inventory.remove_slot_item(slot_index)
 	if removed == null:
 		return false
-	var stock_name := _get_storage_name_for_item(removed)
-	_warehouse_stock[stock_name] = int(_warehouse_stock.get(stock_name, 0)) + 1
+	WarehouseManager.add_item(removed)
 	if _storage_overlay != null and _storage_overlay.visible:
-		_populate_backpack_grid(_storage_overlay.find_child("BackpackGrid", true, false) as GridContainer)
-		_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
+		_storage_overlay.refresh_backpack()
+		_storage_overlay.refresh_warehouse()
 	return true
 
 
@@ -924,64 +663,37 @@ func transfer_backpack_slot_to_container(slot_index: int) -> bool:
 		return false
 	_set_search_feedback("已存入容器。")
 	if _search_overlay != null and _search_overlay.visible:
-		_populate_backpack_grid(_search_overlay.find_child("BackpackGrid", true, false) as GridContainer)
-		_populate_container_list()
+		_search_overlay.refresh_backpack()
+		_search_overlay.refresh_container()
 	return true
 
 
 func can_accept_storage_drop(data: Variant, target: String) -> bool:
-	if not (data is Dictionary):
+	if _drag_drop_controller == null:
 		return false
-	var payload: Dictionary = data
-	var source := String(payload.get("source", ""))
-	if target == "backpack_slot":
-		return source == "warehouse" or source == "container"
-	if target == "warehouse_list":
-		return source == "backpack"
-	if target == "container_list":
-		return source == "backpack"
-	return false
+	return _drag_drop_controller.can_accept_drop(data, target)
 
 
 func accept_storage_drop(data: Variant, target: String) -> bool:
-	if not can_accept_storage_drop(data, target):
+	if _drag_drop_controller == null:
 		return false
-	var payload: Dictionary = data
-	var source := String(payload.get("source", ""))
-	if target == "backpack_slot" and source == "warehouse":
-		return transfer_storage_item_to_backpack(String(payload.get("item_name", "")))
-	if target == "backpack_slot" and source == "container":
-		return _transfer_container_entry(int(payload.get("entry_index", -1)))
-	if target == "warehouse_list" and source == "backpack":
-		return transfer_backpack_slot_to_storage(int(payload.get("slot_index", -1)))
-	if target == "container_list" and source == "backpack":
-		return transfer_backpack_slot_to_container(int(payload.get("slot_index", -1)))
-	return false
+	return _drag_drop_controller.accept_drop(data, target)
 
 
 func _transfer_warehouse_item(item_name: String) -> bool:
 	if _inventory == null:
 		return false
-	var stock := int(_warehouse_stock.get(item_name, 0))
-	if stock <= 0:
+	var item: ItemDataResource = WarehouseManager.remove_item(item_name)
+	if item == null:
 		_on_pickup_blocked("仓库物品已耗尽。")
 		return false
-	var item: ItemDataResource = _warehouse_items.get(item_name, null)
-	if item == null:
-		return false
 	if not _inventory.add_item(item):
+		WarehouseManager.add_item(item)
 		return false
-	_warehouse_stock[item_name] = stock - 1
-	_populate_backpack_grid(_storage_overlay.find_child("BackpackGrid", true, false) as GridContainer)
-	_populate_warehouse_list(_storage_overlay.find_child("WarehouseList", true, false) as VBoxContainer)
+	if _storage_overlay != null and _storage_overlay.visible:
+		_storage_overlay.refresh_backpack()
+		_storage_overlay.refresh_warehouse()
 	return true
-
-
-func _get_storage_name_for_item(item: ItemDataResource) -> String:
-	for item_name in _warehouse_items.keys():
-		if _warehouse_items[item_name] == item:
-			return String(item_name)
-	return item.item_name
 
 
 func _set_search_feedback(text: String) -> void:
@@ -1107,16 +819,7 @@ func _update_container_search_labels() -> void:
 			label.text = _container_slot_text(i)
 
 
-func _show_main_overlay(is_show: bool) -> void:
-	if _main_overlay != null:
-		_main_overlay.visible = is_show
-	if is_show and _result_overlay != null:
-		_result_overlay.visible = false
-	if is_show:
-		close_blocking_overlay()
-	_set_run_hud_visible(not is_show)
-
-
+# HUD toggle helper - kept for menu_controller to use
 func _set_run_hud_visible(is_show: bool) -> void:
 	if top_left.get_parent() is PanelContainer:
 		top_left.get_parent().visible = is_show
@@ -1138,59 +841,32 @@ func _set_run_hud_visible(is_show: bool) -> void:
 	blocked_label.visible = is_show and blocked_label.visible
 
 
-func _on_title_clicked() -> void:
-	GameManager.enter_afterglow()
-	_clear_main_summary()
-	_show_main_overlay(false)
-
-
-func _start_run_from_ui() -> void:
-	var state := GameManager.current_state
-	if state == GameManager.State.SUCCESS or state == GameManager.State.DEAD:
-		GameManager.request_start_after_reload()
-		get_tree().reload_current_scene()
-		return
-	GameManager.start_run()
-	_clear_main_summary()
-	_show_main_overlay(false)
-
-
-func _return_to_home_from_result() -> void:
-	_clear_main_summary()
-	_show_main_overlay(true)
-	GameManager.return_to_afterglow()
-	_show_main_overlay(false)
-
-
-func _on_main_overlay_gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_on_title_clicked()
-
-
 func _on_health_changed(current: float, maximum: float) -> void:
-	var safe_maximum := maxf(maximum, 1.0)
-	hp_bar.value = current / safe_maximum * 100.0
-	hp_label.text = "生命  %d / %d" % [int(round(current)), int(round(maximum))]
+	if _player_status_ui != null:
+		_player_status_ui.on_health_changed(current, maximum)
 
 
 func _on_erosion_changed(value: float) -> void:
-	erosion_bar.value = value
-	erosion_label.text = "侵蚀  %d%%" % int(round(value))
+	if _player_status_ui != null:
+		_player_status_ui.on_erosion_changed(value)
 
 
 func _on_ammo_changed(current: int, max_value: int) -> void:
-	ammo_label.text = "弹药  %d / %d" % [current, max_value]
+	if _player_status_ui != null:
+		_player_status_ui.on_ammo_changed(current, max_value)
 
 
-func _on_collectible_changed(count: int, score: int) -> void:
-	collectible_label.text = "收集品  %d" % count
-	score_label.text = "分数  %d" % score
+func _on_collectible_changed(_count: int, _score: int) -> void:
+	if _backpack_overlay != null and _backpack_overlay.visible: _backpack_overlay.update_stats()
+	if _storage_overlay != null and _storage_overlay.visible: _storage_overlay.update_stats()
+	if _search_overlay != null and _search_overlay.visible: _search_overlay.update_stats()
 
+func _on_inventory_changed(slots: Array, _current_weight: float, _max_weight: float) -> void:
 
-func _on_inventory_changed(slots: Array, current_weight: float, max_weight: float) -> void:
-	weight_label.text = "负重  %d / %d" % [int(round(current_weight)), int(round(max_weight))]
 	if _active_blocking_overlay != null:
-		_populate_backpack_grid(_get_visible_backpack_grid())
+		if _backpack_overlay != null and _backpack_overlay.visible: _backpack_overlay.refresh_backpack()
+		if _storage_overlay != null and _storage_overlay.visible: _storage_overlay.refresh_backpack()
+		if _search_overlay != null and _search_overlay.visible: _search_overlay.refresh_backpack()
 	for i in _slot_panels.size():
 		var panel: Panel = _slot_panels[i]
 		var fill := panel.get_node_or_null("Fill") as ColorRect
@@ -1213,16 +889,16 @@ func _on_pickup_blocked(reason: String) -> void:
 
 
 func _on_state_changed(new_state: int) -> void:
-	if _state_label != null:
-		_state_label.text = "状态  %s" % _get_state_text(new_state)
-	_update_signal_label()
-	_update_end_flow(new_state)
-	if new_state == GameManager.State.RUNNING or new_state == GameManager.State.EXTRACTING:
-		_show_main_overlay(false)
+
+	if _player_status_ui != null:
+		_player_status_ui.update_signal_label(_extraction)
+	if _menu_controller != null:
+		_menu_controller.on_state_changed(new_state)
 
 
 func _on_signal_flare_fired(_origin: Vector3) -> void:
-	_update_signal_label()
+	if _player_status_ui != null:
+		_player_status_ui.update_signal_label(_extraction)
 	blocked_label.text = "信号已发射。守住撤离区域。"
 	blocked_label.visible = true
 	_blocked_hide_timer = 2.0
@@ -1230,7 +906,7 @@ func _on_signal_flare_fired(_origin: Vector3) -> void:
 
 func _on_location_changed(location: int) -> void:
 	if location == GameManager.Location.TITLE:
-		set_risk_label_text("风险  标题")
+
 		if _zone_container != null:
 			_zone_container.visible = false
 		if _minimap != null:
@@ -1238,7 +914,7 @@ func _on_location_changed(location: int) -> void:
 		if _sprint_container != null:
 			_sprint_container.visible = false
 	elif location == GameManager.Location.AFTERGLOW:
-		set_risk_label_text("余晖号")
+
 		if _zone_container != null:
 			_zone_container.visible = false
 		if _minimap != null:
@@ -1246,120 +922,13 @@ func _on_location_changed(location: int) -> void:
 		if _sprint_container != null:
 			_sprint_container.visible = false
 	elif location == GameManager.Location.EXPEDITION:
-		set_risk_label_text("风险  低风险")
+
 		if _zone_container != null:
 			_zone_container.visible = true
 		if _minimap != null:
 			_minimap.visible = true
 		if _sprint_container != null:
 			_sprint_container.visible = true
-
-
-func _update_time_label() -> void:
-	if _time_label == null:
-		return
-	var total_seconds: int = int(floor(GameManager.elapsed_time))
-	var minutes: int = floori(float(total_seconds) / 60.0)
-	var seconds: int = total_seconds % 60
-	_time_label.text = "时间  %02d:%02d" % [minutes, seconds]
-
-
-func _update_signal_label() -> void:
-	if _signal_label == null:
-		return
-	if not GameManager.signal_flare_used:
-		_signal_label.text = "信号  就绪"
-		return
-	if _extraction != null and _extraction.has_method("get_status_text"):
-		_signal_label.text = "信号  %s" % _extraction.get_status_text()
-	else:
-		_signal_label.text = "信号  已发射"
-
-
-func _update_sprint_ui() -> void:
-	if _sprint_bar == null or _sprint_status_label == null:
-		return
-	if _player == null or not is_instance_valid(_player):
-		_player = get_tree().get_first_node_in_group("player")
-	if _player == null:
-		return
-	if not _player.has_method("is_sprinting") or not _player.has_method("get_sprint_cooldown_ratio"):
-		return
-
-	var is_sprinting: bool = _player.is_sprinting()
-	var cooldown_ratio: float = _player.get_sprint_cooldown_ratio()
-	var duration_ratio: float = 0.0
-	if _player.has_method("get_sprint_duration_ratio"):
-		duration_ratio = _player.get_sprint_duration_ratio()
-
-	var fg := _sprint_bar.get_theme_stylebox("fill") as StyleBoxFlat
-	if fg == null:
-		fg = StyleBoxFlat.new()
-		fg.set_corner_radius_all(6)
-		_sprint_bar.add_theme_stylebox_override("fill", fg)
-
-	if is_sprinting:
-		_sprint_bar.value = duration_ratio * 100.0
-		_sprint_status_label.text = "激活"
-		_sprint_status_label.add_theme_color_override("font_color", SPRINT_COLOR_ACTIVE)
-		fg.bg_color = SPRINT_COLOR_ACTIVE
-		fg.shadow_color = SPRINT_COLOR_ACTIVE * Color(1.0, 1.0, 1.0, 0.2)
-	elif cooldown_ratio > 0.0:
-		var fill_ratio := 1.0 - cooldown_ratio
-		_sprint_bar.value = fill_ratio * 100.0
-		_sprint_status_label.text = "恢复中 %d%%" % int(round(fill_ratio * 100.0))
-		_sprint_status_label.add_theme_color_override("font_color", SPRINT_COLOR_COOLDOWN)
-		fg.bg_color = SPRINT_COLOR_COOLDOWN
-		fg.shadow_color = Color(0, 0, 0, 0)
-	else:
-		_sprint_bar.value = 100.0
-		_sprint_status_label.text = "就绪"
-		_sprint_status_label.add_theme_color_override("font_color", SPRINT_COLOR_READY)
-		fg.bg_color = SPRINT_COLOR_READY
-		fg.shadow_color = SPRINT_COLOR_READY * Color(1.0, 1.0, 1.0, 0.2)
-
-
-func _update_end_flow(state: int) -> void:
-	if state != GameManager.State.SUCCESS and state != GameManager.State.DEAD:
-		if _result_overlay != null:
-			_result_overlay.visible = false
-		return
-
-	# 死亡 / 撤离成功时，强制关掉背包/仓库/容器搜索弹层，否则它们会挡住结算屏。
-	if _active_blocking_overlay != null:
-		close_blocking_overlay()
-
-	var success := state == GameManager.State.SUCCESS
-	var score := _get_run_score() if success else 0
-	_result_title_label.text = "撤离成功" if success else "行动失败"
-	_result_stats_label.text = "分数  %d\n击杀  %d\n侵蚀  %d%%\n时间  %s" % [
-		score,
-		GameManager.kill_count,
-		int(round(GameManager.player_erosion)),
-		_format_elapsed_time(),
-	]
-	if _main_overlay != null:
-		_main_overlay.visible = false
-	_set_run_hud_visible(false)
-	GameManager.set_ui_blocking_input(true)
-	_result_overlay.visible = true
-
-
-func _set_main_summary(title: String, stats: String) -> void:
-	if _main_prompt_label != null:
-		_main_prompt_label.text = "上次行动: %s" % title
-	if _main_summary_label != null:
-		_main_summary_label.text = "%s\n\n按回车、空格或点击开始进行新一轮行动。" % stats
-		_main_summary_label.visible = true
-
-
-func _clear_main_summary() -> void:
-	if _main_prompt_label != null:
-		_main_prompt_label.text = "点击任意位置开始"
-	if _main_summary_label != null:
-		_main_summary_label.text = ""
-		_main_summary_label.visible = false
-
 
 func _get_run_score() -> int:
 	if _inventory != null and _inventory.has_method("calculate_score"):

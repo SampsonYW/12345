@@ -39,7 +39,8 @@ func _press_enter(hud: Node) -> void:
 	event.keycode = KEY_ENTER
 	event.physical_keycode = KEY_ENTER
 	event.pressed = true
-	hud._unhandled_input(event)
+	if hud.get("_input_interceptor") != null:
+		hud._input_interceptor._unhandled_input(event)
 
 
 func _finish() -> void:

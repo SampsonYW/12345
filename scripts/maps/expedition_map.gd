@@ -371,10 +371,11 @@ func _update_risk_label() -> void:
 	var risk: String = info.get("risk", "low")
 	GameManager.zone_erosion_multiplier = 1.5 if risk == "high" else 1.0
 	
-	if _hud != null and _hud.has_method("set_zone_info"):
-		_hud.set_zone_info(info["name"], risk)
-	elif _hud != null and _hud.has_method("set_risk_label_text"):
-		_hud.set_risk_label_text("风险  %s" % get_player_risk_label())
+	if _hud != null:
+		if _hud.has_method("set_zone_info"):
+			_hud.set_zone_info(info["name"], risk)
+		if _hud.has_method("set_risk_label_text"):
+			_hud.set_risk_label_text("风险  %s" % get_player_risk_label())
 
 
 # ---------------------------------------------------------------------------

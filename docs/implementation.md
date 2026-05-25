@@ -105,6 +105,7 @@ project/
 |------|------|------|
 | `GameManager` | `scripts/managers/game_manager.gd` | Run 状态机、侵蚀、计时、信号弹冷却、UI 阻塞开关、当前地图位置 |
 | `NoiseManager` | `scripts/managers/noise_manager.gd` | 噪音广播（按 group "enemies" 遍历 + 距离衰减） |
+| `WarehouseManager` | `scripts/managers/warehouse_manager.gd` | 仓库数据与物品存储中心，与 UI 完全解耦 |
 
 ⚠️ `SpawnManager` **不是 Autoload**——它是 `Game3D` 节点下的普通节点，意味着其他模块拿它只能 `get_tree().current_scene.get_node_or_null("SpawnManager")`，或者由 `Game3D` 在初始化时显式注入。
 
@@ -398,23 +399,22 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 
 ### 10.1 它做什么
 
-约 1800 行的 Control 脚本。在主玩法过程中承担：
+约 600 行的 Control 脚本（曾重达 1800+ 行，经过深度重构解耦）。在主玩法过程中承担：
 
-1. **状态条** — HP / 侵蚀 / 弹药 / 负重 / 分数 / 残响碎片数 / 当前 zone 信息 / 风险标签 / 计时
-2. **背包格 + 三种弹层**：
-   - **背包弹层**（按 B 打开）— 8 格只显示
-   - **仓库弹层**（甲板靠近仓库按 E 打开）— 背包 8 格 + 仓库列表，双向拖拽 / 右键转移
-   - **容器搜索弹层**（容器破解后按 E 打开）— 背包 8 格 + 容器 12 格网格，双向拖拽 + 实时搜索进度
-3. **拖拽路由** — 通过 `storage_drag_slot.gd` 包装，统一在 `can_accept_storage_drop / accept_storage_drop` 路由不同 source/target 组合（backpack ↔ warehouse，backpack ↔ container）
-4. **右键菜单** — 上下文菜单 ID 1..6 分别覆盖：使用 / 丢弃 / 背包→仓库 / 仓库→背包 / 容器→背包 / 背包→容器
-5. **结果弹层** — Run 结束（SUCCESS/DEAD）的成绩屏 + 重启
-6. **主菜单 overlay** — PREPARING 状态的"开始游戏"提示
+1. **【已提取】状态条** — `player_status_ui.gd` (HP/侵蚀/弹药/冲刺/信号弹)
+2. **【已提取】背包格 + 三种弹层**：这些弹层现由 `overlay_builder.gd` 生成界面，具体逻辑由三个专用类接管：
+   - **`InventoryOverlay`**（背包界面）
+   - **`WarehouseOverlay`**（仓库界面）
+   - **`ContainerSearchOverlay`**（探索界面）
+3. **【已提取】拖拽路由** — 已拆分到 `drag_drop_controller.gd`。
+4. **【已提取】右键菜单** — 已拆分到 `context_menu_controller.gd`。
+5. **【已提取】结果弹层与主菜单提示** — 已拆分到 `menu_overlay_controller.gd`，接管死亡/撤离结算以及游戏初始状态拦截。
 7. **保持进度条** — afterglow 出发点长按 E 进度
 8. **屏幕边缘警戒指示** — `_alert_indicators` 把 ALERT_DETECTION_RANGE 内觉醒的敌人画成屏幕边缘红点
 9. **刷怪脉冲** — 监听 `SpawnManager.spawn_occurred`，在敌人方向上画一次性脉冲
 10. **小地图** — `_minimap = Minimap.new()`，绘制由 Minimap 类自己处理
-11. **键盘输入劫持** — `_unhandled_input` 响应：B（开/关背包 overlay）、ESC（关闭任意 overlay）、Enter/Space（在主菜单/结果弹层时确认）、**数字键 1–8（仅在 blocking overlay 打开时）调 `Inventory.use_slot(i)` 消耗对应槽位物品并刷新背包格**。数字键只在背包/仓库/容器搜索弹层打开时生效，关闭时不响应——确保玩家只能在看到背包内容的情况下使用物品。
-12. **结算屏接管** — `_update_end_flow` 在 SUCCESS/DEAD 进入时**强制关闭任意激活的 blocking overlay**（背包/仓库/容器搜索）+ 隐藏 main_overlay + 隐藏运行时 HUD + 显示 result_overlay。强制关闭这一步是必须的——否则玩家在 loot 界面里被打死时 overlay 会挡住 result_overlay，UI 卡住。
+11. **【已提取】键盘输入劫持** — 已拆分到 `hud_input_interceptor.gd`。
+12. **【已提取】结算屏接管** — `_update_end_flow` 已移至 `menu_overlay_controller.gd`。
 
 ### 10.2 内部状态字段（直接节点引用 + 数据缓存共 70+ 变量）
 
@@ -422,10 +422,7 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 - 玩家三大组件的弱引用：`_inventory / _player_health / _player_shooting`
 - 外部系统引用：`_extraction / _spawn_manager / _search_container`
 - 弹层根节点：`_backpack_overlay / _storage_overlay / _search_overlay / _active_blocking_overlay / _main_overlay / _result_overlay`
-- 状态标签：`_state_label / _time_label / _signal_label / _prompt_label / _risk_label / _zone_name_label / _zone_risk_label / _zone_container`
-- 上下文菜单临时状态：`_context_menu / _context_slot_index / _context_warehouse_name / _context_container_index`
-- 仓库 stock 字典（hardcoded 4 种物品名 → 数量）：`_warehouse_stock / _warehouse_order / _warehouse_items`
-- 容器搜索内部：`_search_active_index / _search_feedback_label / _search_entry_snapshot`
+- 状态标签：`_signal_label / _prompt_label / _zone_name_label / _zone_risk_label / _zone_container`
 - 视觉效果：`_alert_indicators / _spawn_pulses / _blocked_hide_timer`
 
 ### 10.3 耦合
@@ -445,14 +442,14 @@ GameManager / NoiseManager 不在树里，挂在 `/root` 下。
 
 ⚠️ **HUD 是当前最严重的耦合枢纽**：
 
-1. **HUD 知道 Player 节点结构**：`_bind_player_refs` 直接 `player.get_node_or_null("PlayerHealth" / "PlayerShooting" / "Inventory")`，写死了 Player 子节点名。
-2. **HUD 知道 Container 内部数据**：`_get_container_entry_label` 把 revealed/transferred/search_progress 三个内部字段的语义都搬到 UI 里。
-3. **HUD 持有仓库库存**：`_warehouse_stock` 字典写死在 HUD 里，是真正的仓库数据源——这违反了 rules.md §1.4 "HUD 不承担玩法逻辑"。建议把 warehouse 单独抽成一个数据节点。
-4. **HUD 直接 hardcode 物品资源路径**：`ITEM_RELIC / ITEM_AMMO / ITEM_BATTERY / ITEM_PURIFIER` 四个常量 preload `.tres`——其他模块改 `.tres` 路径 / 增加物品种类时必须同步 HUD。
-5. **HUD 路由所有拖拽**：`storage_drag_slot.gd` 是薄包装；所有 source/target 配对的合法性判断和实际转移都在 HUD 的 `can_accept_storage_drop / accept_storage_drop`，未来新增第 4 种 drop 上下文（如 "丢弃到地面"）都要改 HUD。
-6. **HUD 同时是 Render 也是 Controller**：右键菜单弹出、ID 分发、上下文 slot/container index 记忆全在 HUD，这部分逻辑可以抽出成单独的 ContextMenuController。
+1. **【已改善】HUD 知道 Player 节点结构**：虽然 `_bind_player_refs` 依然直接 `player.get_node_or_null` 获取子节点，但状态 UI 已经移至独立的 `PlayerStatusUI`，不再混杂在主逻辑中。
+2. **【已修复】HUD 知道 Container 内部数据**：已通过 `ContainerSearchOverlay` 将搜索逻辑从 HUD 主文件抽离，交由专门的 Controller 处理。
+3. **【已修复】HUD 持有仓库库存**：已将仓库数据和逻辑提取为全局单例 `WarehouseManager`，彻底与 UI 解耦。
+4. **【已修复】HUD 直接 hardcode 物品资源路径**：已移入 `ItemData.Type` 资源字典映射。
+5. **【已修复】HUD 路由所有拖拽**：已拆分到独立的 `DragDropController`。
+6. **【已修复】HUD 同时是 Render 也是 Controller**：右键菜单已拆分到 `ContextMenuController`；键盘快捷键已拆分到 `HUDInputInterceptor`。
 
-短期不动，但下次重构 UI 时应优先解决 #3 仓库逻辑、#5 拖拽路由这两点。
+短期内可以开始着手解决 #1 引用耦合和 #2 容器数据耦合。
 
 ### 10.4 storage_drag_slot.gd —— 拖拽包装
 
