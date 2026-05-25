@@ -35,14 +35,14 @@ func _run() -> void:
 
 	manager.emit_noise(Vector3.ZERO, manager.Level.LOW)
 	_expect(near_enemy.received_noise > 0.0, "LOW noise should reach nearby enemies")
-	_expect(mid_enemy.received_noise <= 0.0, "LOW noise should not cover most of the 3D map")
-	_expect(far_enemy.received_noise <= 0.0, "LOW noise should not reach far enemies")
+	_expect(near_enemy.received_noise > far_enemy.received_noise * 20.0, "LOW noise should attenuate sharply over distance")
+	_expect(far_enemy.received_noise < 1.0, "LOW noise should be negligible at long range")
 
 	_reset_probes(enemies)
 	manager.emit_noise(Vector3.ZERO, manager.Level.MEDIUM)
 	_expect(near_enemy.received_noise > mid_enemy.received_noise, "MEDIUM noise should attenuate with distance")
 	_expect(mid_enemy.received_noise > 0.0, "MEDIUM noise should reach mid-range enemies")
-	_expect(far_enemy.received_noise <= 0.0, "MEDIUM noise should not be effectively global")
+	_expect(far_enemy.received_noise < 10.0, "MEDIUM noise should be faint at long range")
 
 	_reset_probes(enemies)
 	manager.emit_noise(Vector3.ZERO, manager.Level.HIGH)

@@ -15,6 +15,9 @@ var _sprint_timer: float = 0.0
 var _cooldown_timer: float = 0.0
 var _is_sprinting: bool = false
 var _aim_direction: Vector3 = Vector3.FORWARD
+var _walk_noise_timer: float = 0.0
+
+const WALK_NOISE_INTERVAL := 0.5
 
 
 func _ready() -> void:
@@ -34,6 +37,15 @@ func _physics_process(delta: float) -> void:
 	velocity = move_dir * speed
 	move_and_slide()
 	_clamp_to_bounds()
+
+	# 走路脚步声：非冲刺移动时每 0.5s 发出一声 VERY_LOW 噪音
+	if move_dir.length_squared() > 0.01 and not _is_sprinting:
+		_walk_noise_timer += delta
+		if _walk_noise_timer >= WALK_NOISE_INTERVAL:
+			_walk_noise_timer = 0.0
+			NoiseManager.emit_noise(global_position, NoiseManager.Level.VERY_LOW)
+	else:
+		_walk_noise_timer = 0.0
 
 	GameManager.player_position = global_position
 	_update_aim_direction(move_dir)
