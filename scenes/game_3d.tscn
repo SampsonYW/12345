@@ -38,7 +38,7 @@ outline_size = 6
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 projection = 1
-size = 18.0
+size = 21.6
 current = true
 
 [node name="Entities" type="Node3D" parent="."]

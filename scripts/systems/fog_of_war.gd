@@ -10,11 +10,11 @@ extends Node3D
 
 @export_group("Vision Shape")
 ## 视野锥最大射程（米），鼠标瞄向方向
-@export var cone_range: float = 14.0
+@export var cone_range: float = 16.8
 ## 视野锥半夹角（度）。总开角 = 2× 此值；默认 60° → 120° 总开角
 @export var cone_half_angle_deg: float = 60.0
 ## 近距全向感知圆半径（米）。在此圆内不受锥角限制，仍可见
-@export var close_radius: float = 3.5
+@export var close_radius: float = 4.2
 
 @export_group("Erosion Coupling")
 ## 侵蚀拉满时，cone_range 缩到此倍数（0.5 = 一半）。design.md §5.4

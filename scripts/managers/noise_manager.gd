@@ -8,7 +8,7 @@ enum Level {
 	VERY_LOW = 10,
 	LOW = 20,
 	MEDIUM = 50,
-	HIGH = 80,
+	HIGH = 70,
 	GLOBAL = 120,
 }
 
