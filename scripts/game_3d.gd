@@ -13,6 +13,7 @@ const EXTRACTION_SCRIPT := preload("res://scripts/systems/extraction.gd")
 const FOG_OF_WAR_SCENE := preload("res://scenes/fog_of_war.tscn")
 const SPAWN_MANAGER_SCRIPT := preload("res://scripts/managers/spawn_manager.gd")
 const CAMERA_OCCLUSION_SCRIPT := preload("res://scripts/systems/camera_occlusion.gd")
+const BGM_MANAGER_SCRIPT := preload("res://scripts/systems/bgm_manager.gd")
 
 const CAMERA_OFFSET := Vector3(0.0, 18.0, 18.0)
 
@@ -37,6 +38,7 @@ func _ready() -> void:
 	_add_fog_of_war()
 	_add_extraction_system()
 	_add_camera_occlusion_system()
+	_add_bgm_manager()
 	if not GameManager.state_changed.is_connected(_on_game_state_changed):
 		GameManager.state_changed.connect(_on_game_state_changed)
 	if not GameManager.location_changed.is_connected(_on_location_changed):
@@ -156,6 +158,15 @@ func _add_camera_occlusion_system() -> void:
 	occlusion.name = "CameraOcclusion"
 	occlusion.set_script(CAMERA_OCCLUSION_SCRIPT)
 	add_child(occlusion)
+
+
+func _add_bgm_manager() -> void:
+	if get_node_or_null("BGMManager") != null:
+		return
+	var bgm := Node.new()
+	bgm.name = "BGMManager"
+	bgm.set_script(BGM_MANAGER_SCRIPT)
+	add_child(bgm)
 
 
 func _add_spawn_manager() -> void:

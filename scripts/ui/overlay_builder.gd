@@ -22,12 +22,25 @@ static func populate_backpack_grid(grid: GridContainer, hud: Control) -> void:
 		box.add_theme_constant_override("separation", 4)
 		slot.add_child(box)
 
+		var item = slots[i] if i < slots.size() else null
+
+		if item != null and item.icon != null:
+			var icon := TextureRect.new()
+			icon.texture = item.icon
+			icon.custom_minimum_size = Vector2(48.0, 48.0)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			box.add_child(icon)
+
 		var title := Label.new()
 		title.name = "ItemName"
 		title.clip_text = true
 		title.add_theme_font_size_override("font_size", 18)
 		title.add_theme_color_override("font_color", Color(0.92, 0.96, 0.90, 1.0))
-		var item = slots[i] if i < slots.size() else null
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		title.text = item.item_name if item != null else ""
 		if item != null:
 			slot.set("drag_payload", {
@@ -39,7 +52,8 @@ static func populate_backpack_grid(grid: GridContainer, hud: Control) -> void:
 
 		var detail := Label.new()
 		detail.text = "栏位 %d" % (i + 1)
-		detail.add_theme_font_size_override("font_size", 15)
+		detail.add_theme_font_size_override("font_size", 13)
+		detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		detail.add_theme_color_override("font_color", Color(0.62, 0.70, 0.66, 1.0))
 		box.add_child(detail)
 

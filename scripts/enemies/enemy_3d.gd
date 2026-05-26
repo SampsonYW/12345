@@ -6,6 +6,7 @@
 # [AI-ASSISTED] 2026-05-24 — 寻路迁移到 Godot NavigationServer3D + NavigationAgent3D，删除自建 A*
 # [AI-ASSISTED] 2026-05-24 — 敌人AI性能优化：寻路/视线/billboard 节流
 # [AI-ASSISTED] 2026-05-24 — 巡逻寻路改用 NavigationAgent3D，修复撞墙/摩擦
+# [AI-ASSISTED] 2026-05-26 — Sprite3D 接入美术 2D 立绘（巡逻型/休眠型按 enemy_type 选贴图）
 extends CharacterBody3D
 
 signal died(enemy: CharacterBody3D)
@@ -24,6 +25,11 @@ const HP_BAR_HEIGHT := 0.08
 const HP_BAR_DEPTH := 0.04
 const NAV_UPDATE_INTERVAL := 0.2
 const VISION_CHECK_INTERVAL := 0.15
+
+const ENEMY_TEXTURES := {
+	EnemyType.PATROL: "res://assets/sprites/enemies/enemy_patrol_base.png",
+	EnemyType.DORMANT: "res://assets/sprites/enemies/enemy_sleeper_base.png",
+}
 
 @export var alert_threshold: float = 100.0
 @export var decay_rate: float = 5.0
@@ -65,15 +71,18 @@ var _vision_cone: MeshInstance3D = null
 var _body_mesh: MeshInstance3D = null
 var _original_material: Material = null
 var _hit_flash_timer: float = 0.0
+var _sprite: Sprite3D = null
 const HIT_FLASH_DURATION := 0.1
 
 
 func _ready() -> void:
 	add_to_group("enemies")
-	
+
 	_body_mesh = get_node_or_null("BodyVisual") as MeshInstance3D
 	if _body_mesh != null:
 		_original_material = _body_mesh.material_override
+		_body_mesh.visible = false
+	_init_sprite()
 	if enemy_type == EnemyType.PATROL:
 		_create_vision_cone()
 	_nav_agent = get_node_or_null("NavAgent") as NavigationAgent3D
@@ -88,14 +97,33 @@ func _ready() -> void:
 	_vision_check_timer = randf() * VISION_CHECK_INTERVAL
 
 
+func _init_sprite() -> void:
+	_sprite = get_node_or_null("Sprite") as Sprite3D
+	if _sprite == null:
+		_sprite = Sprite3D.new()
+		_sprite.name = "Sprite"
+		# 巡逻 ≈ 1292×1551, 休眠 ≈ 1756×1286
+		# pixel_size 0.0013 → 巡逻 1.68×2.02m / 休眠 2.28×1.67m，匹配 1.8-2.2m 敌人身高
+		_sprite.position = Vector3(0, 1.0, 0)
+		_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_sprite.pixel_size = 0.0013
+		_sprite.shaded = false
+		_sprite.transparent = true
+		_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
+		add_child(_sprite)
+	var path: String = ENEMY_TEXTURES.get(enemy_type, "")
+	if path != "" and ResourceLoader.exists(path):
+		_sprite.texture = load(path)
+
+
 func _process(delta: float) -> void:
 	if not _is_awake and _current_alert > 0.0:
 		_current_alert = maxf(0.0, _current_alert - decay_rate * delta)
 	# 受击闪白计时
 	if _hit_flash_timer > 0.0:
 		_hit_flash_timer -= delta
-		if _hit_flash_timer <= 0.0 and _body_mesh != null and _original_material != null:
-			_body_mesh.material_override = _original_material
+		if _hit_flash_timer <= 0.0 and _sprite != null:
+			_sprite.modulate = Color.WHITE
 
 
 func _physics_process(delta: float) -> void:
@@ -193,13 +221,8 @@ func force_awaken() -> void:
 func take_damage(amount: float, from_player: bool = true) -> void:
 	_current_hp -= amount
 	# 受击闪白
-	if _body_mesh != null:
-		var flash_mat := StandardMaterial3D.new()
-		flash_mat.albedo_color = Color.WHITE
-		flash_mat.emission_enabled = true
-		flash_mat.emission = Color.WHITE
-		flash_mat.emission_energy_multiplier = 0.6
-		_body_mesh.material_override = flash_mat
+	if _sprite != null:
+		_sprite.modulate = Color(2.4, 2.4, 2.4, 1.0)
 		_hit_flash_timer = HIT_FLASH_DURATION
 	if from_player:
 		force_awaken()
@@ -525,7 +548,27 @@ func _create_vision_cone() -> void:
 
 func _die() -> void:
 	died.emit(self)
+	_spawn_death_vfx()
 	var manager := _get_game_manager()
 	if manager != null and manager.has_method("register_kill"):
 		manager.register_kill()
 	queue_free()
+
+
+func _spawn_death_vfx() -> void:
+	const DEATH_TEXTURE := preload("res://assets/sprites/effects/effect_enemy_destroyed.png")
+	const DEATH_VFX_DURATION := 0.45
+	var parent := get_tree().current_scene
+	if parent == null:
+		return
+	var sprite := Sprite3D.new()
+	sprite.texture = DEATH_TEXTURE
+	sprite.position = global_position + Vector3(0, 1.0, 0)
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	# PNG ≈ 1325×1232；pixel_size 0.0015 → ≈ 1.99×1.85m
+	sprite.pixel_size = 0.0015
+	sprite.shaded = false
+	sprite.transparent = true
+	sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
+	parent.add_child(sprite)
+	parent.get_tree().create_timer(DEATH_VFX_DURATION).timeout.connect(Callable(sprite, "queue_free"))

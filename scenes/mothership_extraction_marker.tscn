@@ -1,4 +1,7 @@
-[gd_scene format=3 uid="uid://mothershipextractionmarker01"]
+[gd_scene load_steps=10 format=3 uid="uid://mothershipextractionmarker01"]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/vehicles/vehicle_mothership_afterglow_distant.png" id="1_mothership"]
+[ext_resource type="Texture2D" path="res://assets/sprites/effects/effect_mothership_arrival.png" id="2_arrival"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_landing"]
 top_radius = 3.5
@@ -27,26 +30,6 @@ emission_enabled = true
 emission = Color(0, 1, 0.85, 1)
 emission_energy_multiplier = 1.6
 
-[sub_resource type="BoxMesh" id="BoxMesh_hull"]
-size = Vector3(5.8, 0.75, 2.4)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hull"]
-albedo_color = Color(0.54, 0.58, 0.62, 1)
-roughness = 0.65
-emission_enabled = true
-emission = Color(0.2, 0.9, 0.85, 1)
-emission_energy_multiplier = 0.25
-
-[sub_resource type="BoxMesh" id="BoxMesh_ramp"]
-size = Vector3(2, 0.2, 2.8)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ramp"]
-albedo_color = Color(0.24, 0.32, 0.34, 1)
-roughness = 0.65
-emission_enabled = true
-emission = Color(0, 0.75, 0.7, 1)
-emission_energy_multiplier = 0.2
-
 [node name="MothershipExtractionMarker" type="Node3D"]
 
 [node name="LandingPad" type="MeshInstance3D" parent="."]
@@ -59,15 +42,23 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 mesh = SubResource("CylinderMesh_beam")
 material_override = SubResource("StandardMaterial3D_beam")
 
-[node name="MothershipHull" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.8, 0)
-mesh = SubResource("BoxMesh_hull")
-material_override = SubResource("StandardMaterial3D_hull")
+[node name="MothershipSprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.5, 0)
+texture = ExtResource("1_mothership")
+billboard = 1
+pixel_size = 0.008
+shaded = false
+transparent = true
+alpha_cut = 2
 
-[node name="BoardingRamp" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 1.85)
-mesh = SubResource("BoxMesh_ramp")
-material_override = SubResource("StandardMaterial3D_ramp")
+[node name="ArrivalEffectSprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+texture = ExtResource("2_arrival")
+billboard = 1
+pixel_size = 0.0018
+shaded = false
+transparent = true
+alpha_cut = 2
 
 [node name="ExtractionLight" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.5, 0)

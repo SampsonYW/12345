@@ -3,19 +3,40 @@
 # 3D ground pickup that hands items to the player's Inventory.
 # [AI-ASSISTED] 2026-05-19 - 3D pickup logic.
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
+# [AI-ASSISTED] 2026-05-26 — 用 Sprite3D 接入美术 2D 立绘
 extends Area3D
 
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
 
+const PICKUP_TEXTURES := {
+	ItemDataResource.Type.COLLECTIBLE: "res://assets/sprites/pickups/pickup_resonance_world.png",
+	ItemDataResource.Type.AMMO: "res://assets/sprites/pickups/pickup_ammo_world.png",
+	ItemDataResource.Type.BATTERY: "res://assets/sprites/pickups/pickup_battery_world.png",
+	ItemDataResource.Type.PURIFIER: "res://assets/sprites/pickups/pickup_purifier_world.png",
+}
+
 @export var item_data: ItemDataResource
 
 @onready var _visual: MeshInstance3D = $Visual
+var _sprite: Sprite3D = null
 
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
-	if _visual.material_override != null:
-		_visual.material_override = _visual.material_override.duplicate()
+	_sprite = get_node_or_null("Sprite") as Sprite3D
+	if _sprite == null:
+		_sprite = Sprite3D.new()
+		_sprite.name = "Sprite"
+		# PNG ≈ 1500×1375；pixel_size 0.0005 → Sprite ≈ 0.75×0.69m，匹配 0.56m SphereMesh
+		_sprite.position = Vector3(0, 0.45, 0)
+		_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_sprite.pixel_size = 0.0005
+		_sprite.shaded = false
+		_sprite.transparent = true
+		_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
+		add_child(_sprite)
+	if _visual != null:
+		_visual.visible = false
 	_update_visual()
 
 
@@ -26,28 +47,11 @@ func set_item(item: ItemDataResource) -> void:
 
 
 func _update_visual() -> void:
-	if item_data == null:
+	if item_data == null or _sprite == null:
 		return
-	var color := Color(0.9, 0.9, 0.9, 1.0)
-	match item_data.type:
-		ItemDataResource.Type.COLLECTIBLE:
-			color = Color(0.95, 0.65, 0.25, 1.0)
-		ItemDataResource.Type.AMMO:
-			color = Color(0.4, 0.6, 0.95, 1.0)
-		ItemDataResource.Type.BATTERY:
-			color = Color(0.35, 0.85, 0.45, 1.0)
-		ItemDataResource.Type.PURIFIER:
-			color = Color(0.35, 0.85, 0.85, 1.0)
-	if _visual.material_override is StandardMaterial3D:
-		_visual.material_override.albedo_color = color
-		_visual.material_override.emission_enabled = true
-		_visual.material_override.emission = color * 0.2
-	else:
-		var material := StandardMaterial3D.new()
-		material.albedo_color = color
-		material.emission_enabled = true
-		material.emission = color * 0.2
-		_visual.material_override = material
+	var texture_path: String = PICKUP_TEXTURES.get(item_data.type, "")
+	if texture_path != "" and ResourceLoader.exists(texture_path):
+		_sprite.texture = load(texture_path)
 
 
 func _on_body_entered(body: Node) -> void:
