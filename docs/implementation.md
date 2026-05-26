@@ -89,6 +89,7 @@ project/
 │   │   └── wasteland_decoration_poi.gd
 │   └── ui/
 │       ├── hud.gd                 # ⚠️ 巨型脚本 1800 行，见 §10
+│       ├── intro_overlay.gd       # 开场动画 overlay（程序化创建）
 │       ├── minimap.gd
 │       └── storage_drag_slot.gd   # 给 HUD 容器 / 仓库 / 背包当 drag-drop 包装
 ├── resources/items/               # ItemData .tres
@@ -659,6 +660,15 @@ assets/
 - `_pick_track()` 优先级：`DEAD / SUCCESS / EXTRACTING > location(TITLE/AFTERGLOW/EXPEDITION)`
 - 切歌用 Tween 做 fade-out → swap → fade-in，避免 BGM 切换硬切
 - BGM 文件按用途命名：`bgm_title / bgm_afterglow / bgm_exploration / bgm_extraction / bgm_extraction_end / bgm_success / bgm_death / bgm_combat`
+
+### 开场动画（`scripts/ui/intro_overlay.gd`）
+
+- 资源：`res://assets/video/intro_2k.ogv`（1080p Theora + Vorbis，由 1440p MP4 经 ffmpeg `-c:v libtheora -q:v 7 -c:a libvorbis -q:a 5` 转码而来，因为 Godot 4 内置 VideoStream 只支持 OGV/Theora）
+- `game_3d.gd._show_intro_overlay()` 在 `_ready` 末尾调用：当 `current_state == PREPARING` 时把 `IntroOverlay` Control 挂到 `UI` CanvasLayer 下（盖在 HUD MainOverlay 之上）
+- IntroOverlay 程序化构建：黑色 BG + 全屏 `VideoStreamPlayer` + 右上角透明 Skip 按钮（半透明深色 + 蓝边框）
+- 触发 `_finish` 的三个入口：视频 `finished` 信号 / 点击 Skip 按钮 / 按 ESC / SPACE / ENTER（`_unhandled_input`）
+- 播放期间 `GameManager.set_ui_blocking_input(true)` 阻断玩家输入和射击；销毁前恢复为 false
+- 切 Run（DEAD/SUCCESS → return_to_afterglow 重置回 PREPARING）时不会再播放——`_show_intro_overlay()` 是 `_ready` 一次性触发，且会检查 `UI/IntroOverlay` 是否已存在
 
 ### 耦合
 

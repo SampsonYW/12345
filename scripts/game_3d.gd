@@ -14,6 +14,7 @@ const FOG_OF_WAR_SCENE := preload("res://scenes/fog_of_war.tscn")
 const SPAWN_MANAGER_SCRIPT := preload("res://scripts/managers/spawn_manager.gd")
 const CAMERA_OCCLUSION_SCRIPT := preload("res://scripts/systems/camera_occlusion.gd")
 const BGM_MANAGER_SCRIPT := preload("res://scripts/systems/bgm_manager.gd")
+const INTRO_OVERLAY_SCRIPT := preload("res://scripts/ui/intro_overlay.gd")
 
 const CAMERA_OFFSET := Vector3(0.0, 18.0, 18.0)
 
@@ -49,6 +50,21 @@ func _ready() -> void:
 	if GameManager.current_state == GameManager.State.RUNNING:
 		_spawn_enemies()
 	_update_camera()
+	_show_intro_overlay()
+
+
+func _show_intro_overlay() -> void:
+	# 只在首次启动（PREPARING 且位于 TITLE / 主菜单）播放，跨 Run 重启不重复
+	if GameManager.current_state != GameManager.State.PREPARING:
+		return
+	var ui: CanvasLayer = $UI
+	if ui == null:
+		return
+	if ui.get_node_or_null("IntroOverlay") != null:
+		return
+	var intro := Control.new()
+	intro.set_script(INTRO_OVERLAY_SCRIPT)
+	ui.add_child(intro)
 
 
 func _process(delta: float) -> void:
