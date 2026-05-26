@@ -43,10 +43,9 @@ func _process(_delta: float) -> void:
 		if enemy.has_method("get_alert_ratio"):
 			var alert_ratio: float = enemy.get_alert_ratio()
 			alert_bar.value = alert_ratio
+			# 在未觉醒时，如果有警觉值就显示；如果是刚被觉醒或者完全觉醒也可以显示，因为现在我们修改了 get_alert_ratio() 使得觉醒时必定返回 1.0
+			# 我们这里只需处理，如果未被警觉即 alert_ratio == 0 时，不显示
 			alert_bar.visible = alert_ratio > 0.0
-			# 如果觉醒且没有警觉值，进度条也可以隐藏
-			if alert_ratio <= 0.0:
-				alert_bar.visible = false
 
 	# 追踪容器
 	var containers := get_tree().get_nodes_in_group("containers")

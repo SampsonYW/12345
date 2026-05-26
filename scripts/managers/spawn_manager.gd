@@ -310,6 +310,12 @@ func _spawn_fixed(scene: PackedScene, point: Vector3, tier: int = -1) -> Node3D:
 	if scene == null or _get_enemy_parent() == null:
 		return null
 	var clear_point := _find_clear_spawn_position(point)
+	# 每个敌人在刷点周围随机散布 2~5m，避免扎堆；确保不推进玩家 12m 内
+	var angle := randf() * TAU
+	var jitter := randf_range(2.0, 5.0)
+	var jittered := clear_point + Vector3(cos(angle) * jitter, 0.0, sin(angle) * jitter)
+	if jittered.distance_to(GameManager.player_position) >= minimum_spawn_distance:
+		clear_point = jittered
 	var enemy := scene.instantiate() as Node3D
 	_get_enemy_parent().add_child(enemy)
 	enemy.global_position = clear_point

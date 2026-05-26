@@ -136,6 +136,8 @@ func is_awake() -> bool:
 func get_alert_ratio() -> float:
 	if alert_threshold <= 0.0:
 		return 1.0 if _current_alert > 0.0 else 0.0
+	if _is_awake:
+		return 1.0
 	return clampf(_current_alert / alert_threshold, 0.0, 1.0)
 
 
@@ -343,12 +345,9 @@ func _pick_patrol_target() -> void:
 		randf_range(-patrol_radius, patrol_radius)
 	)
 	var candidate := _home_position + offset
-	# 将候选点吸附到 NavMesh 上，避免落在墙内
-	# headless 模式下 NavigationServer 可能尚未同步，跳过吸附降级为原始坐标
-	if _nav_agent != null:
-		var map_rid := _nav_agent.get_navigation_map()
-		if map_rid.is_valid() and NavigationServer3D.map_get_iteration_id(map_rid) > 0:
-			candidate = NavigationServer3D.map_get_closest_point(map_rid, candidate)
+	# 不再做 NavMesh 吸附——map_get_closest_point 会把不同随机点
+	# 全映射到同一个 NavMesh 顶点，导致巡逻敌人全部朝一个点走。
+	# 如果候选点落在障碍物里，NavAgent 会自行绕开。
 	_patrol_target = candidate
 	_patrol_target.y = 0.0
 
