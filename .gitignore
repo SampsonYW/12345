@@ -69,3 +69,6 @@ godot_*.log
 *.tmp
 *.swp
 *~
+
+godot_ready_assets_named/
+resources/require/

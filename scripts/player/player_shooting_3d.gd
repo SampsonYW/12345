@@ -3,9 +3,13 @@
 # 3D 玩家射击：从 FirePoint 沿玩家瞄准方向生成 3D 子弹，保留弹药信号接口给 HUD。
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写射击
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
+# [AI-ASSISTED] 2026-05-26 — 开火时在 FirePoint 生成枪口火光 VFX
 extends Node
 
 signal ammo_changed(current: int, max_value: int)
+
+const MUZZLE_FLASH_TEXTURE := preload("res://assets/sprites/effects/effect_muzzle_flash.png")
+const MUZZLE_FLASH_DURATION := 0.08
 
 @export var bullet_scene: PackedScene
 @export var fire_rate: float = 0.15
@@ -60,6 +64,22 @@ func fire() -> void:
 	_fire_cooldown = fire_rate
 	ammo_changed.emit(current_ammo, max_ammo)
 	NoiseManager.emit_noise(_player.global_position, NoiseManager.Level.HIGH)
+	_spawn_muzzle_flash()
+
+
+func _spawn_muzzle_flash() -> void:
+	if _fire_point == null or MUZZLE_FLASH_TEXTURE == null:
+		return
+	var sprite := Sprite3D.new()
+	sprite.texture = MUZZLE_FLASH_TEXTURE
+	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	# PNG ≈ 1542×1308；pixel_size 0.0005 → ≈ 0.77×0.65m
+	sprite.pixel_size = 0.0005
+	sprite.shaded = false
+	sprite.transparent = true
+	sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
+	_fire_point.add_child(sprite)
+	get_tree().create_timer(MUZZLE_FLASH_DURATION).timeout.connect(Callable(sprite, "queue_free"))
 
 
 func add_ammo(amount: int) -> void:

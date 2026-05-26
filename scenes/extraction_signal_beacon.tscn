@@ -1,4 +1,6 @@
-[gd_scene format=3 uid="uid://extractionsignalbeacon01"]
+[gd_scene load_steps=6 format=3 uid="uid://extractionsignalbeacon01"]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/effects/effect_extraction_zone_loop.png" id="1_extract_loop"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_pending_landing"]
 top_radius = 2.4
@@ -39,3 +41,12 @@ material_override = SubResource("StandardMaterial3D_pending_landing")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
 mesh = SubResource("CylinderMesh_pending_beam")
 material_override = SubResource("StandardMaterial3D_pending_beam")
+
+[node name="LoopEffectSprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+texture = ExtResource("1_extract_loop")
+billboard = 1
+pixel_size = 0.0022
+shaded = false
+transparent = true
+alpha_cut = 2

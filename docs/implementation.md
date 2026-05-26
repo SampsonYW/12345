@@ -2,9 +2,9 @@
 
 > 本文档为 `design.md` 的技术实现补充。**完全脱离代码会很快过时，所以每次代码变更后必须按 `docs/rules.md §6.5` 同步更新本文档。**
 >
-> **最后更新**: 2026-05-25 (新增 zone_erosion_multiplier 动态侵蚀)
+> **最后更新**: 2026-05-26 (美术资源接入：Sprite3D 立绘 / ItemData 图标 / 容器状态贴图 / 命中 VFX / BGM 系统)
 >
-> **当前口径**: 主玩法已完全切换到 3D 正交斜俯视。已落地：3D 玩家 / 射击 / HP / 背包 / 容器搜索（带条目模型 + 双向转移）/ 敌人 AI（巡逻 + 休眠合并一个脚本）/ 噪音 / 信号弹与撤离 / 时间-侵蚀刷怪 / 可视视野（视野锥 + 近距圆）/ 母车甲板与探索场景双地图切换 / POI 驱动的远征地图（8 个 POI 模块自包含构建）/ HUD 三态弹层（背包 / 仓库 / 容器搜索）+ 拖拽与右键菜单。本文档按模块自顶向下描述实现思路与**模块间耦合关系**。
+> **当前口径**: 主玩法已完全切换到 3D 正交斜俯视。已落地：3D 玩家 / 射击 / HP / 背包 / 容器搜索（带条目模型 + 双向转移）/ 敌人 AI（巡逻 + 休眠合并一个脚本）/ 噪音 / 信号弹与撤离 / 时间-侵蚀刷怪 / 可视视野（视野锥 + 近距圆）/ 母车甲板与探索场景双地图切换 / POI 驱动的远征地图（8 个 POI 模块自包含构建）/ HUD 三态弹层（背包 / 仓库 / 容器搜索）+ 拖拽与右键菜单 / 美术资源接入（玩家/敌人/容器/拾取物/母车/信号弹用 Sprite3D 立绘；物品图标；命中 VFX；BGM 按状态切换）。本文档按模块自顶向下描述实现思路与**模块间耦合关系**。
 
 ---
 
@@ -73,6 +73,7 @@ project/
 │   ├── systems/
 │   │   ├── fog_of_war.gd          # 实际是"可视视野"，文件名沿用
 │   │   ├── extraction.gd          # 信号弹后的等待 → 母车 → 登船流程
+│   │   ├── bgm_manager.gd         # BGM 状态机：监听 GameManager 信号切歌
 │   │   └── camera_occlusion.gd    # 摄像机遮挡体积检测与墙体透明化
 │   ├── maps/
 │   │   ├── afterglow_map.gd       # 母车甲板交互（仓库、出发点）
@@ -134,6 +135,7 @@ Game3D (Node3D)                       — scripts/game_3d.gd
 │   └── Player3D                      — 含子节点 Inventory / PlayerHealth / PlayerShooting / FirePoint
 ├── SpawnManager                      — scripts/managers/spawn_manager.gd
 ├── Extraction                        — scripts/systems/extraction.gd
+├── BGMManager                        — scripts/systems/bgm_manager.gd（监听 GameManager 切 BGM）
 ├── FogOfWar                          — 实例化自 fog_of_war.tscn
 ├── CameraOcclusion                   — scripts/systems/camera_occlusion.gd
 └── UI (CanvasLayer)
@@ -590,6 +592,79 @@ Run 结束（SUCCESS 或 DEAD）后，通过 HUD 结算屏 → `GameManager.retu
 - **扫描区域**：在 `_physics_process` 中，使用半径 `1.5m` 的 `SphereShape3D`，从 `Camera3D` 向玩家胸口（Y=1.0）发射体积扫描，形成一个贯穿的圆柱形检测区域。
 - **目标过滤**：只碰撞 `collision_mask = 68`（高障碍 + 矮障碍）。
 - **平滑插值**：对扫中的所有障碍物，将其内部 `MeshInstance3D` 的材质临时开启 `TRANSPARENCY_ALPHA`，并通过 `move_toward` 每一帧将 `albedo_color.a` 降至 `0.3`。当障碍物离开扫描区域后，Alpha 恢复至 `1.0`，并彻底关闭 `TRANSPARENCY_DISABLED` 以保证渲染性能和深度排序。
+
+---
+
+## 13.6 美术资源接入（Sprite3D 立绘 + 物品图标 + VFX + BGM）
+
+> 美术 2D 立绘（俯视/正视半立绘风格 PNG）接入 3D 正交斜俯视场景的策略：**Sprite3D + billboard**，让平面图朝向摄像机。3D mesh placeholder 整体保留逻辑（用于碰撞 / 受击反馈基底），仅 `visible = false` 隐藏几何视觉。
+
+### 资源目录结构
+
+```
+assets/
+├── sprites/
+│   ├── characters/        # 主角 5 张（idle / walk / dash / hurt / death）
+│   ├── enemies/           # 巡逻型 / 休眠型 各 1 张
+│   ├── containers/        # 普通 / 弹药 / 医疗 × 关闭 / 破解中 / 打开
+│   ├── icons/             # 物品图标（残响 / 弹药 / 电池 / 净化剂）
+│   ├── pickups/           # 物品地面拾取物 4 张
+│   ├── vehicles/          # 母车远景剪影 1 张
+│   ├── effects/           # 枪口火光 / 命中 / 击毁 / 信号弹 / 撤离区 / 母车到达
+│   └── maps/              # 地图概念图（参考用）
+└── audio/
+    └── bgm/               # 8 首 BGM（按位置/状态命名）
+```
+
+### 接入点速查
+
+| 模块 | 节点 | 资源 | 切换逻辑 |
+|------|------|------|---------|
+| 玩家 `Player3D` | 子节点 Sprite3D（动态创建）| `assets/sprites/characters/player_aster_*.png` | `_process` 每帧按 `_is_dead / _hurt_timer / _is_sprinting / velocity` 选 idle/walk/dash/hurt/death |
+| 敌人 `Enemy3D` | 子节点 Sprite3D（动态创建）| `assets/sprites/enemies/enemy_*_base.png` | `_init_sprite()` 按 `enemy_type` 选贴图，受击时 `modulate` 拉到 2.4 闪白 |
+| 容器 `Container3D` | 子节点 Sprite3D（动态创建）| `assets/sprites/containers/container_*_*.png` | `_infer_kind_from_loot()` 从 `loot_table` 推断类型，`_apply_sprite_state(closed/hacking/open)` 切贴图 |
+| 拾取物 `ItemPickup3D` | 子节点 Sprite3D（动态创建）| `assets/sprites/pickups/pickup_*_world.png` | `_update_visual()` 按 `item_data.type` 选贴图 |
+| 物品图标 `ItemData.icon` | TextureRect | `assets/sprites/icons/icon_*.png` | HUD `_on_inventory_changed` + `overlay_builder.populate_backpack_grid` 优先读 `item.icon`，无图标回退到 `TYPE_COLORS` |
+| 母车 `mothership_extraction_marker.tscn` | 静态 Sprite3D | `vehicle_mothership_afterglow_distant.png` + `effect_mothership_arrival.png` | 场景内静态摆放 |
+| 撤离信标 `extraction_signal_beacon.tscn` | 静态 Sprite3D | `effect_extraction_zone_loop.png` | 场景内静态摆放 |
+| 信号弹标记 `signal_flare_marker.tscn` | 静态 Sprite3D | `effect_flare_launch.png` | 场景内静态摆放 |
+| 枪口火光 | bullet_3d 子节点（运行时生成）| `effect_muzzle_flash.png` | `PlayerShooting3D.fire()` 后调 `_spawn_muzzle_flash()`，挂在 `FirePoint` 上，0.08s 自销毁 |
+| 命中 VFX | 临时 Sprite3D（运行时生成）| `effect_bullet_hit_mech.png` / `effect_bullet_hit_metal.png` | `Bullet3D._on_body_entered` 调 `_spawn_hit_vfx`，0.25s 自销毁 |
+| 敌人死亡 VFX | 临时 Sprite3D（运行时生成）| `effect_enemy_destroyed.png` | `Enemy3D._die()` 调 `_spawn_death_vfx`，0.45s 自销毁 |
+
+### Sprite3D 通用参数
+
+所有 Sprite3D 都使用相同设置：`billboard = BaseMaterial3D.BILLBOARD_ENABLED`（永远正面对相机）、`shaded = false`（绕过 PBR 光照让美术控色）、`transparent = true`（PNG alpha）。
+
+**pixel_size 必须按各 PNG 实际像素和目标世界尺寸计算**（PNG 都是 ~1500px，pixel_size = 目标米数 / PNG 像素高度），否则 Sprite 会糊住整个画面。当前各处 pixel_size：
+
+| 用途 | PNG 尺寸 | pixel_size | 世界尺寸 |
+|------|---------|-----------|---------|
+| 玩家 | 1072×1863 | 0.001 | 1.07×1.86m |
+| 敌人（巡逻/休眠共用脚本）| 1292×1551 / 1756×1286 | 0.0013 | 1.68×2.02m / 2.28×1.67m |
+| 容器 | 1910×1365 | 0.0008 | 1.53×1.09m |
+| 拾取物 | ≈1500×1375 | 0.0005 | 0.75×0.69m |
+| 母车剪影 | 1938×1443 | 0.008 | 15.5×11.5m |
+| 母车到达 VFX | 2048×1607 | 0.0018 | 3.69×2.89m |
+| 撤离区循环 VFX | 1827×1303 | 0.0022 | 4.02×2.87m |
+| 信号弹 | 1365×1763 | 0.0017 | 2.32×3.00m |
+| 枪口火光 | 1542×1308 | 0.0005 | 0.77×0.65m |
+| 子弹命中 VFX | ≈1700×1500 | 0.0006 | 1.02×0.90m |
+| 敌人爆散 VFX | 1325×1232 | 0.0015 | 1.99×1.85m |
+
+### BGM 系统（`scripts/systems/bgm_manager.gd`）
+
+- 节点名 `BGMManager`，由 `game_3d.gd._add_bgm_manager()` 在 `_ready` 时挂到 Game3D 下
+- 持一个 `AudioStreamPlayer` 子节点，监听 `GameManager.state_changed` 和 `GameManager.location_changed`
+- `_pick_track()` 优先级：`DEAD / SUCCESS / EXTRACTING > location(TITLE/AFTERGLOW/EXPEDITION)`
+- 切歌用 Tween 做 fade-out → swap → fade-in，避免 BGM 切换硬切
+- BGM 文件按用途命名：`bgm_title / bgm_afterglow / bgm_exploration / bgm_extraction / bgm_extraction_end / bgm_success / bgm_death / bgm_combat`
+
+### 耦合
+
+- 美术资源接入**只在视图层**，**不影响**任何 gameplay 逻辑（HP、敌人 AI、容器搜索、噪音、撤离等）
+- `ItemData.icon` 字段是新增的视觉数据点；HUD / overlay_builder 读 icon 时容错（icon null → 回退 TYPE_COLORS 纯色），所以美术资源缺失也不会阻塞主流程
+- 资源路径硬编码在各脚本顶部 `const *_TEXTURES` 字典里（不通过 .tscn 的 ext_resource）；好处是脚本和资源解耦，坏处是改名要改脚本
 
 ---
 

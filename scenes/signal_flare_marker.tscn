@@ -1,4 +1,6 @@
-[gd_scene format=3 uid="uid://signalflaremarker01"]
+[gd_scene load_steps=4 format=3 uid="uid://signalflaremarker01"]
+
+[ext_resource type="Texture2D" path="res://assets/sprites/effects/effect_flare_launch.png" id="1_flare"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_beam"]
 top_radius = 0.16
@@ -17,6 +19,15 @@ emission = Color(1, 0.22, 0.08, 1)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.75, 0)
 mesh = SubResource("CylinderMesh_beam")
 material_override = SubResource("StandardMaterial3D_beam")
+
+[node name="FlareSprite" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.0, 0)
+texture = ExtResource("1_flare")
+billboard = 1
+pixel_size = 0.0017
+shaded = false
+transparent = true
+alpha_cut = 2
 
 [node name="SignalLight" type="OmniLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)

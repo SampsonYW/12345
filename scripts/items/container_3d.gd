@@ -3,11 +3,34 @@
 # 3D 密封容器：玩家进入范围后长按 interact 破解，完成后生成 3D 拾取物。
 # [AI-ASSISTED] 2026-05-19 - 全 3D 重写容器交互
 # [AI-ASSISTED] 2026-05-22 — 按照 docs/rules.md 进行代码标准化
+# [AI-ASSISTED] 2026-05-26 — Sprite3D 接入美术 2D 立绘 + 按 loot_table 推断类型
 extends StaticBody3D
 
 signal cracked(container: StaticBody3D)
 
 const ItemDataResource := preload("res://scripts/items/item_data.gd")
+
+## 容器视觉类型（按 loot_table 自动推断，影响贴图）
+enum ContainerKind { NORMAL, AMMO, MEDICAL }
+
+## 容器各类型 × 各状态的贴图路径
+const CONTAINER_TEXTURES := {
+	ContainerKind.NORMAL: {
+		"closed": "res://assets/sprites/containers/container_supply_closed.png",
+		"hacking": "res://assets/sprites/containers/container_supply_hacking.png",
+		"open": "res://assets/sprites/containers/container_supply_open.png",
+	},
+	ContainerKind.AMMO: {
+		"closed": "res://assets/sprites/containers/container_ammo_closed.png",
+		"hacking": "res://assets/sprites/containers/container_ammo_closed.png",
+		"open": "res://assets/sprites/containers/container_ammo_open.png",
+	},
+	ContainerKind.MEDICAL: {
+		"closed": "res://assets/sprites/containers/container_medical_closed.png",
+		"hacking": "res://assets/sprites/containers/container_medical_closed.png",
+		"open": "res://assets/sprites/containers/container_medical_open.png",
+	},
+}
 
 ## 容器的最大条目数（loot + 玩家放回的物品之和），跟 HUD 里 ContainerGrid 的格子数一致
 const MAX_ENTRIES: int = 12
@@ -22,19 +45,34 @@ var _crack_progress: float = 0.0
 var _is_cracking: bool = false
 var _player_in_range: bool = false
 var _search_entries: Array[Dictionary] = []
+var _container_kind: int = ContainerKind.NORMAL
 
 
 @onready var _visual: MeshInstance3D = $Visual
 @onready var _interact_area: Area3D = $InteractArea
+var _sprite: Sprite3D = null
 
 
 func _ready() -> void:
 	add_to_group("containers")
 	_interact_area.body_entered.connect(_on_body_entered)
 	_interact_area.body_exited.connect(_on_body_exited)
-	if _visual.material_override != null:
-		_visual.material_override = _visual.material_override.duplicate()
-	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
+	_container_kind = _infer_kind_from_loot()
+	_sprite = get_node_or_null("Sprite") as Sprite3D
+	if _sprite == null:
+		_sprite = Sprite3D.new()
+		_sprite.name = "Sprite"
+		# PNG ≈ 1910×1365；pixel_size 0.0008 → Sprite ≈ 1.53×1.09m，匹配 BoxMesh 1.2×1×1.2m
+		_sprite.position = Vector3(0, 0.6, 0)
+		_sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_sprite.pixel_size = 0.0008
+		_sprite.shaded = false
+		_sprite.transparent = true
+		_sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
+		add_child(_sprite)
+	if _visual != null:
+		_visual.visible = false
+	_apply_sprite_state("closed")
 
 
 ## Restore this container to its initial (unopened) state.
@@ -44,7 +82,7 @@ func reset() -> void:
 	_is_cracking = false
 	_player_in_range = false
 	_search_entries.clear()
-	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
+	_apply_sprite_state("closed")
 
 
 
@@ -63,7 +101,6 @@ func _process(delta: float) -> void:
 		if not _is_cracking:
 			_start_crack()
 		_crack_progress += delta / get_crack_duration()
-		_set_visual_color(Color(0.75, 0.62, 0.32, 1.0).lerp(Color(1.0, 0.9, 0.45, 1.0), _crack_progress))
 		if _crack_progress >= 1.0:
 			_complete_crack()
 	else:
@@ -79,6 +116,7 @@ func get_crack_duration() -> float:
 func _start_crack() -> void:
 	_is_cracking = true
 	_crack_progress = 0.0
+	_apply_sprite_state("hacking")
 
 func is_cracking() -> bool:
 	return _is_cracking
@@ -94,7 +132,7 @@ func _complete_crack() -> void:
 		return
 	_is_cracking = false
 	_is_cracked = true
-	_set_visual_color(Color(0.34, 0.3, 0.2, 1.0))
+	_apply_sprite_state("open")
 	NoiseManager.emit_noise(global_position, NoiseManager.Level.LOW)
 	open_container()
 	cracked.emit(self)
@@ -157,6 +195,17 @@ func get_revealed_item_name(index: int) -> String:
 		return ""
 	var item: ItemDataResource = _search_entries[index].item
 	return item.item_name if item != null else ""
+
+
+func get_revealed_item_icon(index: int) -> Texture2D:
+	if not _is_valid_entry_index(index):
+		return null
+	if not bool(_search_entries[index].revealed):
+		return null
+	var item: ItemDataResource = _search_entries[index].item
+	if item == null:
+		return null
+	return item.icon
 
 
 func search_entry(index: int, duration: float) -> bool:
@@ -229,7 +278,7 @@ func get_capacity() -> int:
 func _interrupt() -> void:
 	_is_cracking = false
 	_crack_progress = 0.0
-	_set_visual_color(Color(0.64, 0.52, 0.27, 1.0))
+	_apply_sprite_state("closed")
 
 
 func _is_valid_entry_index(index: int) -> bool:
@@ -248,14 +297,40 @@ func _get_rarity_search_multiplier(rarity: int) -> float:
 			return 1.0
 
 
-func _set_visual_color(color: Color) -> void:
-	if _visual.material_override is StandardMaterial3D:
-		_visual.material_override.albedo_color = color
-	else:
-		var material := StandardMaterial3D.new()
-		material.albedo_color = color
-		material.roughness = 0.84
-		_visual.material_override = material
+## 根据 loot_table 中物品类型推断容器视觉类型。
+## - 全 AMMO → AMMO
+## - 包含 BATTERY 或 PURIFIER → MEDICAL
+## - 其他（COLLECTIBLE 等）→ NORMAL
+func _infer_kind_from_loot() -> int:
+	if loot_table.is_empty():
+		return ContainerKind.NORMAL
+	var has_ammo := false
+	var has_medical := false
+	var has_other := false
+	for item in loot_table:
+		if item == null:
+			continue
+		match item.type:
+			ItemDataResource.Type.AMMO:
+				has_ammo = true
+			ItemDataResource.Type.BATTERY, ItemDataResource.Type.PURIFIER:
+				has_medical = true
+			_:
+				has_other = true
+	if has_medical:
+		return ContainerKind.MEDICAL
+	if has_ammo and not has_other:
+		return ContainerKind.AMMO
+	return ContainerKind.NORMAL
+
+
+func _apply_sprite_state(state: String) -> void:
+	if _sprite == null:
+		return
+	var paths: Dictionary = CONTAINER_TEXTURES.get(_container_kind, CONTAINER_TEXTURES[ContainerKind.NORMAL])
+	var path: String = paths.get(state, "")
+	if path != "" and ResourceLoader.exists(path):
+		_sprite.texture = load(path)
 
 
 func _on_body_entered(body: Node) -> void:

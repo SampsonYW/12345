@@ -1,10 +1,12 @@
-[gd_resource type="Resource" script_class="ItemData" load_steps=2 format=3 uid="uid://item_ammo000"]
+[gd_resource type="Resource" script_class="ItemData" load_steps=3 format=3 uid="uid://item_ammo000"]
 
 [ext_resource type="Script" path="res://scripts/items/item_data.gd" id="1_item_data"]
+[ext_resource type="Texture2D" path="res://assets/sprites/icons/icon_ammo_standard.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1_item_data")
 item_name = "标准弹药"
+icon = ExtResource("2_icon")
 type = 1
 weight = 2.0
 ammo_amount = 25

@@ -578,12 +578,27 @@ func _populate_container_list() -> void:
 		var box := VBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)
 		slot.add_child(box)
+		# 已发现物品显示图标（来自 ItemData.icon）
+		var icon_tex: Texture2D = null
+		if not is_empty and _search_container.has_method("get_revealed_item_icon"):
+			icon_tex = _search_container.get_revealed_item_icon(i)
+		if icon_tex != null:
+			var icon := TextureRect.new()
+			icon.texture = icon_tex
+			icon.custom_minimum_size = Vector2(48.0, 48.0)
+			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			box.add_child(icon)
 		var title := Label.new()
 		title.name = "ItemName"
 		title.clip_text = true
 		title.add_theme_font_size_override("font_size", 18)
 		var color: Color = Color(0.45, 0.48, 0.45, 0.7) if is_empty else Color(0.92, 0.96, 0.90, 1.0)
 		title.add_theme_color_override("font_color", color)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		title.text = text
 		box.add_child(title)
 		grid.add_child(slot)
@@ -900,12 +915,32 @@ func _on_inventory_changed(slots: Array, _current_weight: float, _max_weight: fl
 		var name_label := panel.get_node_or_null("ItemName") as Label
 		if fill == null or name_label == null:
 			continue
+		var icon_rect := panel.get_node_or_null("Icon") as TextureRect
+		if icon_rect == null:
+			icon_rect = TextureRect.new()
+			icon_rect.name = "Icon"
+			icon_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+			icon_rect.offset_left = 8.0
+			icon_rect.offset_top = 8.0
+			icon_rect.offset_right = -8.0
+			icon_rect.offset_bottom = -8.0
+			icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			panel.add_child(icon_rect)
+			panel.move_child(icon_rect, 1)
 		var item: ItemDataResource = slots[i] if i < slots.size() else null
 		if item == null:
 			fill.color = EMPTY_SLOT_COLOR
+			icon_rect.texture = null
 			name_label.text = ""
 		else:
-			fill.color = TYPE_COLORS.get(item.type, Color.WHITE)
+			if item.icon != null:
+				fill.color = Color(0.06, 0.07, 0.09, 0.85)
+				icon_rect.texture = item.icon
+			else:
+				fill.color = TYPE_COLORS.get(item.type, Color.WHITE)
+				icon_rect.texture = null
 			name_label.text = ""
 
 
